@@ -4,11 +4,19 @@
 
   var VEHICLE_LINKED_FIELDS = { "sp-vehicle-rent": "monthlyRent", "sp-vehicle-insurance": "monthlyInsurance" };
 
+  function vehicleAppliesInMonth(v, month, simStart, simEnd) {
+    if (!v || v.include === false) return false;
+    if (!App.Month.parseMonth(month)) return false;
+    var start = App.Month.normalizeMonth(v.startMonth) || simStart;
+    var end = App.Month.normalizeMonth(v.endMonth) || simEnd;
+    if (!App.Month.parseMonth(start) || !App.Month.parseMonth(end)) return false;
+    return App.Month.isInRange(month, start, end);
+  }
+
   function vehicleFieldMonthlyTotal(vehicles, field, month, simStart, simEnd) {
     var total = 0;
     (vehicles || []).forEach(function (v) {
-      if (!v || v.include === false) return;
-      if (!App.Month.appliesInMonth(v, month, simStart, simEnd)) return;
+      if (!vehicleAppliesInMonth(v, month, simStart, simEnd)) return;
       total += App.Money.toSafeNumber(v[field]);
     });
     return App.Money.roundWon(total);
@@ -207,16 +215,13 @@
       if (!v || v.include === false) return null;
       var amount = App.Money.roundWon(v.deposit);
       if (!amount) return null;
-      var follows = App.Engine.followsSimStartMonth ? App.Engine.followsSimStartMonth(v) : true;
       return {
         id: "veh-dep-" + (v.id || ""),
         name: (v.name || "차량") + " 보증금",
         actualAmount: amount,
         include: true,
-        monthMode: v.monthMode,
-        month: follows
-          ? (App.Month.normalizeMonth(startMonth) || App.Month.normalizeMonth(v.startMonth))
-          : App.Month.normalizeMonth(v.startMonth)
+        monthMode: "custom",
+        month: App.Month.normalizeMonth(v.startMonth) || App.Month.normalizeMonth(startMonth)
       };
     }).filter(Boolean);
   }
@@ -258,7 +263,7 @@
         if (!amount) return;
         var total = 0;
         (months || []).forEach(function (m) {
-          if (!App.Month.appliesInMonth(v, m, simStart, simEnd)) return;
+          if (!vehicleAppliesInMonth(v, m, simStart, simEnd)) return;
           out.soloByMonth[m].total = App.Money.roundWon(out.soloByMonth[m].total + amount);
           out.soloByMonth[m].items.push({ id: id, name: name, amount: amount, group: "vehicle" });
           out.exclusiveByMonth[m].total = App.Money.roundWon(out.exclusiveByMonth[m].total + amount);

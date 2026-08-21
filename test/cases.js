@@ -307,12 +307,12 @@
       var seedPol = App.Sample.load();
       var seedEnd = App.Engine.runSimulation(seedPol).kpis.endClosing;
       eq("시드에 지원정책 주입", (seedPol.settings.supportPolicies || []).length, catalog.length);
-      eq("시드 기말 지원정책 불변", seedEnd, 956610430);
+      eq("시드 기말 지원정책 불변", seedEnd, 963410430);
       var rawOld = JSON.parse(App.Store.exportJson(App.Sample.load()));
       delete rawOld.settings.supportPolicies;
       var restoredPol = App.Store.parseImport(JSON.stringify(rawOld));
       assert("구 JSON에 카탈로그 주입", (restoredPol.settings.supportPolicies || []).length === catalog.length);
-      eq("구 JSON 기말 불변", App.Engine.runSimulation(restoredPol).kpis.endClosing, 1066110430);
+      eq("구 JSON 기말 불변", App.Engine.runSimulation(restoredPol).kpis.endClosing, 1072910430);
 
       var htmlPol = App.Render.renderView("simulation", empty(), App.Engine.runSimulation(empty()), {
         simTab: "support",
@@ -1047,8 +1047,8 @@
 
       var sample = App.Sample.load();
       var sampleRun = App.Engine.runSimulation(sample);
-      eq("샘플 기말현금 불변", sampleRun.kpis.endClosing, 956610430);
-      eq("샘플 최저잔액 불변", sampleRun.kpis.minClosing, 7049780);
+      eq("샘플 기말현금 불변", sampleRun.kpis.endClosing, 963410430);
+      eq("샘플 최저잔액 불변", sampleRun.kpis.minClosing, 28075460);
       eq("샘플 추가 필요자금 0", sampleRun.kpis.deficitCover, 0);
       var htmlSampleDash = App.Render.renderView("dashboard", sample, sampleRun);
       assert("샘플 대시보드에 권장 운전자금 없음", htmlSampleDash.indexOf("권장 운전자금") < 0);
@@ -1589,7 +1589,7 @@
       seed.profile.baseRates.ad.count6 = 9;
       App.Defaults.fillSalesPlansToTargets(seed);
       eq("시드 계획 생성해도 확정매출 불변", App.Engine.runSimulation(seed).kpis.inflowInPeriod, seedIn);
-      eq("시드 기말 불변", App.Engine.runSimulation(seed).kpis.endClosing, 956610430);
+      eq("시드 기말 불변", App.Engine.runSimulation(seed).kpis.endClosing, 963410430);
 
       var sPay = empty();
       sPay.profile.startMonth = "2027-01";
@@ -1724,8 +1724,8 @@
       eq("원장 월말 TOTAL=세후월말", close.total, rL.kpis.endClosingAfterTax);
       eq("세후월말=기말-미납법인세주민세", rL.kpis.endClosingAfterTax,
         App.Money.roundWon(rL.kpis.endClosing - rL.kpis.corporateTaxPending - rL.kpis.localTaxPending));
-      eq("샘플 기말 현금", rL.kpis.endClosing, 956610430);
-      eq("샘플 최저 잔액", rL.kpis.minClosing, 7049780);
+      eq("샘플 기말 현금", rL.kpis.endClosing, 963410430);
+      eq("샘플 최저 잔액", rL.kpis.minClosing, 28075460);
 
       var revenueWork = ledgerGroup(rL, "revenue-work");
       var revenueSales = ledgerGroup(rL, "revenue-sales");
@@ -1858,8 +1858,8 @@
       assert("접대비 행", !!ent);
       eq("접대비 기본월", ent.values["2026-12"], -200000);
       eq("접대비 Override 27-06", ent.values["2027-06"], -1200000);
-      eq("비용UI 검증용 기말", rC.kpis.endClosing, 956610430);
-      eq("비용UI 검증용 최저", rC.kpis.minClosing, 7049780);
+      eq("비용UI 검증용 기말", rC.kpis.endClosing, 963410430);
+      eq("비용UI 검증용 최저", rC.kpis.minClosing, 28075460);
 
       var jsonC = App.Store.exportJson(seedC);
       assert("JSON에 accordion 상태 없음", jsonC.indexOf("costItemOpen") < 0 && jsonC.indexOf("costSecOpen") < 0);
@@ -2088,7 +2088,7 @@
       assert("구 JSON 매출연동수수료 기본값 복원", Array.isArray(restoredNoFees.revenueFees) &&
         restoredNoFees.revenueFees.length === 2 && restoredNoFees.revenueFees[0].name === "써니스" &&
         restoredNoFees.revenueFees[1].name === "메리디안");
-      eq("구 JSON 기말현금 = 기본값 적용 결과", App.Engine.runSimulation(restoredNoFees).kpis.endClosing, 745610430);
+      eq("구 JSON 기말현금 = 기본값 적용 결과", App.Engine.runSimulation(restoredNoFees).kpis.endClosing, 752410430);
       var parsedBlankFees = JSON.parse(App.Store.exportJson(App.Sample.load()));
       parsedBlankFees.revenueFees = [
         { id: "old1", name: "", basis: "totalRevenue", rate: 0, category: "sga", include: true },
@@ -2552,9 +2552,9 @@
       eq("구 JSON 무필드는 기본률 20%", App.Engine.calculateProjectExpenseDetail(sMig0.projects[0], sMig0).total, 40000000);
 
       var seedXp = (App.Defaults.seedState || App.Sample.load)();
-      eq("시드 기본률 적용 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 956610430);
+      eq("시드 기본률 적용 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 963410430);
       App.Defaults.ensureState(seedXp);
-      eq("시드 마이그레이션 후 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 956610430);
+      eq("시드 마이그레이션 후 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 963410430);
       assert("시드에 작품 있음", (seedXp.projects || []).length > 0);
       eq("시드 진행비 kpi", App.Engine.runSimulation(seedXp).kpis.projectExpense, 345102000);
 
@@ -2883,8 +2883,8 @@
 
       var seedP = App.Sample.load();
       var seedBefore = App.Engine.runSimulation(seedP);
-      eq("시드 회귀 기말", seedBefore.kpis.endClosing, 956610430);
-      eq("시드 회귀 최저", seedBefore.kpis.minClosing, 7049780);
+      eq("시드 회귀 기말", seedBefore.kpis.endClosing, 963410430);
+      eq("시드 회귀 최저", seedBefore.kpis.minClosing, 28075460);
       seedP.profile.endMonth = "2027-12";
       var seedExt = App.Engine.runSimulation(seedP);
       eq("시드 기존 운영비는 전체기간 유지", monthRow(seedExt, "2027-12").recurring, 8350000);
@@ -3363,7 +3363,7 @@
       assert("산식 라벨 배우 지원가치 없음", htmlBen.indexOf("배우 지원가치") < 0);
       assert("공통 지원 제외 안내", htmlBen.indexOf("양 시나리오에서 동일하게 발생하므로 경제가치 비교에서 제외") >= 0);
       assert("공통 지원 금액 표시", htmlBen.indexOf(App.Format.formatWon(soloB.commonActorSupportValue)) >= 0);
-      eq("시드 기말 불변(경제가치 산식)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 956610430);
+      eq("시드 기말 불변(경제가치 산식)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 963410430);
     } catch (e) { fail("배우 지원가치 동일기준 예외", e.message || e); }
 
     try {
@@ -3381,11 +3381,11 @@
         return !/차량보증금/.test(d.name || "");
       }));
       var seedVehRun = App.Engine.runSimulation(seedVeh);
-      eq("시드 차량 전환 후 기말 불변", seedVehRun.kpis.endClosing, 956610430);
+      eq("시드 차량 전환 후 기말 불변", seedVehRun.kpis.endClosing, 963410430);
       eq("시드 차량 전환 후 보증금 45M", seedVehRun.kpis.deposits, 45000000);
       assert("시드 차량 렌트는 판관비", seedVehRun.kpis.supportSga > 0);
-      eq("원장 하이리무진 보증금", ledgerItem(ledgerGroup(seedVehRun, "funding"), "하이리무진 보증금").values["2026-10"], -30000000);
-      eq("원장 스텝 차량 보증금", ledgerItem(ledgerGroup(seedVehRun, "funding"), "일반 스텝 차량 보증금").values["2026-10"], -10000000);
+      eq("원장 하이리무진 보증금은 계약 시작월(11월)", ledgerItem(ledgerGroup(seedVehRun, "funding"), "하이리무진 보증금").values["2026-11"], -30000000);
+      eq("원장 스텝 차량 보증금은 계약 시작월(27-04)", ledgerItem(ledgerGroup(seedVehRun, "funding"), "일반 스텝 차량 보증금").values["2027-04"], -10000000);
 
       var vehEditOpen = { "vehicles-section": true };
       seedVeh.vehicles.forEach(function (v) { vehEditOpen[v.id] = true; });
@@ -4483,7 +4483,7 @@
       var htmlEmptyPay = App.Render.renderView("revenue", sZeroPay, rZeroPay, { workItemOpen: {} });
       assert("지급 미설정 안내", htmlEmptyPay.indexOf("지급일정이 없으면") >= 0);
 
-      eq("시드 기말 현금 불변", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 956610430);
+      eq("시드 기말 현금 불변", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 963410430);
       eq("시드 검산 차이 0", App.Engine.runSimulation(App.Sample.load()).revenueGap.gap, 0);
     } catch (e) { fail("지급일정-월별분석 연동 예외", e.message || e); }
 
@@ -4601,7 +4601,7 @@
       var beforeSga = App.Engine.runSimulation(seedSga);
       App.Defaults.ensureState(seedSga);
       var afterSga = App.Engine.runSimulation(seedSga);
-      eq("판관비 재분류 후 기말 불변", afterSga.kpis.endClosing, 956610430);
+      eq("판관비 재분류 후 기말 불변", afterSga.kpis.endClosing, 963410430);
       eq("판관비 재분류 후 운영비 KPI 불변", afterSga.kpis.opex, beforeSga.kpis.opex);
       eq("판관비 재분류 후 손익비용 불변", afterSga.kpis.pnlExpense, beforeSga.kpis.pnlExpense);
       assert("인건비 family=sga", (seedSga.employees || []).every(function (e) { return e.family === "sga"; }));
@@ -4612,7 +4612,7 @@
 
       var jsonSga = App.Store.exportJson(seedSga);
       var restoredSga = App.Store.parseImport(jsonSga);
-      eq("JSON 왕복 기말 불변", App.Engine.runSimulation(restoredSga).kpis.endClosing, 956610430);
+      eq("JSON 왕복 기말 불변", App.Engine.runSimulation(restoredSga).kpis.endClosing, 963410430);
       assert("JSON 왕복 family 유지", restoredSga.employees[0].family === "sga");
 
       var payGroup = ledgerGroup(afterSga, "payroll");
@@ -4771,8 +4771,8 @@
       var rFollow = App.Engine.runSimulation(sFollow);
       eq("시작월 따라 초기비용 10월", monthRow(rFollow, "2026-10").startupCost, 340000);
       eq("구월 초기비용 0", monthRow(rFollow, "2026-11").startupCost, 0);
-      eq("시작월 따라 사무실 보증금 10월", monthRow(rFollow, "2026-10").deposits, 35000000);
-      eq("구월 보증금 0", monthRow(rFollow, "2026-11").deposits, 0);
+      eq("시작월 따라 사무실 보증금 10월", monthRow(rFollow, "2026-10").deposits, 5000000);
+      eq("차량 보증금은 차량 계약월(11월) 반영", monthRow(rFollow, "2026-11").deposits, 30000000);
 
       sFollow.startupExpenses[0].monthMode = "custom";
       sFollow.deposits[0].monthMode = "custom";
@@ -4818,7 +4818,8 @@
       eq("잔여 start/end 운영비 10월", monthRow(rOpexLeft, "2026-10").recurring, 50000);
       eq("잔여 start/end 운영비 27-12", monthRow(rOpexLeft, "2027-12").recurring, 50000);
       eq("잔여 start/end 인건비 10월", monthRow(rOpexLeft, "2026-10").payroll, 1000000);
-      eq("잔여 start/end 차량렌트 10월", monthRow(rOpexLeft, "2026-10").support, 800000);
+      eq("차량은 자기 계약월부터 적용되어 10월엔 렌트 없음", monthRow(rOpexLeft, "2026-10").support, 0);
+      eq("차량 렌트는 계약 시작월(11월)부터 적용", monthRow(rOpexLeft, "2026-11").support, 800000);
       assert("잔여 날짜만 있으면 전체기간", !App.Month.usesCustomPeriod(sOpexFollow.recurringExpenses[0]));
 
       App.Defaults.ensureState(sOpexFollow);
@@ -4858,8 +4859,8 @@
       eq("직접지정 차량렌트 10월 0", monthRow(rVehCustom, "2026-10").support, 0);
       eq("직접지정 차량렌트 11월", monthRow(rVehCustom, "2026-11").support, 800000);
 
-      eq("시드 기말 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 956610430);
-      eq("시드 최저 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.minClosing, 7049780);
+      eq("시드 기말 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 963410430);
+      eq("시드 최저 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.minClosing, 28075460);
     } catch (e) { fail("운영비 시뮬레이션 기간 연동 예외", e.message || e); }
 
     try {
