@@ -7,7 +7,7 @@
 
   var state = seedState();
   var result = null;
-    var ui = { view: "dashboard", selectedMonth: null, savedAt: null, loadError: false, rateOpen: {}, costTab: "opex", analysisTab: "scenarios", simTab: "basics", supportOpen: {}, costSecOpen: {}, costItemOpen: {}, planEditId: null, planPayOpen: {}, workOpen: {}, workItemOpen: {}, ledgerOpen: {}, ledgerYearOpen: {}, budgetPanelOpen: false, moreMenuOpen: false, personalTaxScenario: "", taxFoldOpen: {}, revenueRateHelpOpen: false, ledgerHelpOpen: false, scenarioCorpHelpOpen: false, scenarioSoloPersonHelpOpen: false, scenarioExPersonHelpOpen: false, analysisTaxHelpOpen: false, analysisConsistencyOpen: false, revenueDraft: null, revenueDraftSourceId: null };
+    var ui = { view: "dashboard", selectedMonth: null, savedAt: null, loadError: false, savedLoadOpen: false, rateOpen: {}, costTab: "opex", rent2fTab: "included", analysisTab: "scenarios", simTab: "basics", supportOpen: {}, costSecOpen: {}, costItemOpen: {}, planEditId: null, planPayOpen: {}, workOpen: {}, workItemOpen: {}, ledgerOpen: {}, ledgerYearOpen: {}, budgetPanelOpen: false, moreMenuOpen: false, personalTaxScenario: "", taxFoldOpen: {}, revenueRateHelpOpen: false, ledgerHelpOpen: false, scenarioCorpHelpOpen: false, scenarioSoloPersonHelpOpen: false, scenarioExPersonHelpOpen: false, analysisTaxHelpOpen: false, analysisConsistencyOpen: false, revenueDraft: null, revenueDraftSourceId: null };
   var saveTimer = null;
 
   function getByPath(obj, path) {
@@ -125,8 +125,27 @@
     syncSetupStickyTop();
   }
 
+  var SAVED_LOAD_KEY = "solo-agency-budget:saved-load-done";
+
+  function markSavedLoadDone() {
+    ui.savedLoadOpen = false;
+    try { sessionStorage.setItem(SAVED_LOAD_KEY, "1"); } catch (err) {}
+  }
+
+  function applyCanonicalSeed() {
+    var prevMeta = state.meta;
+    state = seedState();
+    if (prevMeta && prevMeta.budgetId) {
+      state.meta = state.meta || {};
+      state.meta.budgetId = prevMeta.budgetId;
+      state.meta.title = prevMeta.title;
+      state.meta.createdAt = prevMeta.createdAt;
+    }
+  }
+
   function activateBudget(newState) {
     if (!newState) return;
+    if (ui.savedLoadOpen) markSavedLoadDone();
     state = newState;
     ui.selectedMonth = null;
     ui.budgetPanelOpen = false;
@@ -317,7 +336,14 @@
         e.stopPropagation();
         return;
       }
-      if (e.target.closest("summary [data-action], summary input, summary textarea, summary .with-unit")) {
+      var summaryAction = e.target.closest("summary [data-action]");
+      if (summaryAction) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (summaryAction.tagName !== "SELECT") handleAction(summaryAction);
+        return;
+      }
+      if (e.target.closest("summary input, summary textarea, summary .with-unit, summary button")) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -383,6 +409,7 @@
       reader.onload = function () {
         try {
           state = App.Store.parseImport(String(reader.result));
+          markSavedLoadDone();
           afterChange(true);
         } catch (err) {
           alert("가져오기에 실패했습니다. " + (err.message || err));
@@ -491,6 +518,14 @@
         if (!App.Month.parseMonth(item.startMonth)) item.startMonth = state.profile.startMonth;
         if (!App.Month.parseMonth(item.endMonth)) item.endMonth = state.profile.endMonth;
       }
+    }
+    if (path === "settings.scenarios.soloAgency.ownerPayout.dividendRate") {
+      App.Defaults.setOwnerDividendMode(state, "rate");
+      App.Defaults.setOwnerDividendOn(state, true);
+    }
+    if (path === "settings.scenarios.soloAgency.ownerPayout.dividendAmount") {
+      App.Defaults.setOwnerDividendMode(state, "amount");
+      App.Defaults.setOwnerDividendOn(state, true);
     }
     if (/\.percentage$/.test(path)) {
       setByPath(state, path.replace(/\.percentage$/, ".inputMode"), "percent");
@@ -622,7 +657,8 @@
   function costSecIdsForTab(tab) {
     if (tab === "startup") return ["startup"];
     if (tab === "funding") return ["deposits", "assets", "inflows"];
-    return ["sga-parent", "payroll", "recurring-rent", "recurring-marketing", "welfare", "support-vehicle", "support-actor", "recurring-sga"];
+    if (tab === "project") return ["project-direct", "project-agency"];
+    return ["sga-parent", "payroll", "insurance", "recurring-rent", "recurring-marketing", "welfare", "support-vehicle", "support-actor", "revenue-fees", "recurring-sga"];
   }
 
   var COST_LIST_SEC = {
@@ -659,6 +695,15 @@
     ui.workItemOpen[p.id] = true;
   }
 
+  function analysisFoldOpenFromUi(id) {
+    var open = ui.analysisFoldOpen;
+    if (open && Object.prototype.hasOwnProperty.call(open, id)) return !!open[id];
+    var tab = ui.analysisTab || "compare";
+    if (tab === "monthly") return id === "monthly" || id === "cash";
+    if (tab === "income-tax") return id === "glance";
+    return id === "scenarios" || id === "cash";
+  }
+
   function handleAction(btn) {
     var action = btn.getAttribute("data-action");
     var index = Number(btn.getAttribute("data-index"));
@@ -668,6 +713,10 @@
       ui.view = btn.getAttribute("data-view");
       if (ui.view === "projects") ui.view = "revenue";
       if (ui.view === "setup") ui.view = "simulation";
+      if (ui.view === "settings") {
+        ui.view = "simulation";
+        ui.simTab = "settings";
+      }
       closeAllHelp();
       setMoreMenuOpen(false);
       renderMain();
@@ -678,8 +727,12 @@
       closeAllHelp();
       ui.revenueRateHelpOpen = true;
       renderMain();
-      var closeBtn = document.querySelector(".app-modal-x");
-      if (closeBtn) closeBtn.focus();
+      var firstRate = document.querySelector(".app-modal-rates input");
+      if (firstRate) firstRate.focus();
+      else {
+        var closeBtn = document.querySelector(".app-modal-x");
+        if (closeBtn) closeBtn.focus();
+      }
       return;
     }
     if (action === "close-revenue-rate-help") {
@@ -774,21 +827,27 @@
     if (action === "goto-rent2f") {
       ui.view = "costs";
       ui.costTab = "rent2f";
+      ui.rent2fTab = "included";
       renderMain();
       refreshSticky();
       return;
     }
+    if (action === "load-saved") {
+      applyCanonicalSeed();
+      markSavedLoadDone();
+      afterChange(true);
+      return;
+    }
+    if (action === "dismiss-saved-load") {
+      markSavedLoadDone();
+      renderMain();
+      return;
+    }
     if (action === "reset") {
       setMoreMenuOpen(false);
-      if (confirm("엑셀 기반 기본 시드로 되돌릴까요? 지금 입력은 덮어씁니다.")) {
-        var prevMeta = state.meta;
-        state = seedState();
-        if (prevMeta && prevMeta.budgetId) {
-          state.meta = state.meta || {};
-          state.meta.budgetId = prevMeta.budgetId;
-          state.meta.title = prevMeta.title;
-          state.meta.createdAt = prevMeta.createdAt;
-        }
+      if (confirm("저장된 최종 시드로 되돌릴까요? 지금 입력은 덮어씁니다.")) {
+        applyCanonicalSeed();
+        markSavedLoadDone();
         afterChange(true);
       }
       return;
@@ -895,9 +954,45 @@
       renderMain();
       return;
     }
+    if (action === "rent2f-tab") {
+      ui.costTab = "rent2f";
+      ui.rent2fTab = btn.getAttribute("data-tab") || "included";
+      renderMain();
+      return;
+    }
     if (action === "analysis-tab") {
-      ui.analysisTab = btn.getAttribute("data-tab") || "scenarios";
+      var nextTab = btn.getAttribute("data-tab") || "compare";
+      if (nextTab === "multiples") nextTab = "compare";
+      ui.analysisTab = nextTab;
       closeAllHelp();
+      renderMain();
+      return;
+    }
+    if (action === "toggle-analysis-fold") {
+      var foldId = btn.getAttribute("data-id");
+      if (!foldId) return;
+      if (!ui.analysisFoldOpen) {
+        ui.analysisFoldOpen = {
+          monthly: analysisFoldOpenFromUi("monthly"),
+          cash: analysisFoldOpenFromUi("cash"),
+          scenarios: analysisFoldOpenFromUi("scenarios"),
+          glance: analysisFoldOpenFromUi("glance")
+        };
+      }
+      ui.analysisFoldOpen[foldId] = !ui.analysisFoldOpen[foldId];
+      if (ui.analysisTab === "revenue-floor") ui.analysisTab = "compare";
+      renderMain();
+      return;
+    }
+    if (action === "analysis-folds-collapse" || action === "analysis-folds-expand") {
+      var foldOn = action === "analysis-folds-expand";
+      ui.analysisFoldOpen = {
+        monthly: foldOn,
+        cash: foldOn,
+        scenarios: foldOn,
+        glance: foldOn
+      };
+      if (ui.analysisTab === "revenue-floor") ui.analysisTab = "compare";
       renderMain();
       return;
     }
@@ -957,6 +1052,21 @@
     }
     if (action === "set-split-basis") {
       App.Defaults.applySplitBasisToggle(state, btn.getAttribute("data-basis"));
+      afterChange(true);
+      return;
+    }
+    if (action === "toggle-solo-tax-edit") {
+      ui.soloTaxFormEdit = !ui.soloTaxFormEdit;
+      renderMain();
+      return;
+    }
+    if (action === "set-dividend-on") {
+      App.Defaults.setOwnerDividendOn(state, btn.getAttribute("data-on") === "1");
+      afterChange(true);
+      return;
+    }
+    if (action === "set-dividend-mode") {
+      App.Defaults.setOwnerDividendMode(state, btn.getAttribute("data-mode"));
       afterChange(true);
       return;
     }
@@ -1072,6 +1182,11 @@
       ui.planCategory = "";
       ui.workOpen[cat] = true;
       ui.workItemOpen[proj.id] = true;
+    } else if (action === "regenerate-multiples") {
+      ui.multiplierCache = null;
+    } else if (action === "select-multiplier") {
+      ui.multiplierSelected = Number(btn.getAttribute("data-m")) || 1;
+      if (ui.analysisTab === "revenue-floor") ui.analysisTab = "compare";
     } else if (action === "remove-project") {
       var removed = state.projects[index];
       state.projects.splice(index, 1);
@@ -1309,8 +1424,17 @@
       var viewQ = new URLSearchParams(window.location.search).get("view");
       if (viewQ === "projects") viewQ = "revenue";
       if (viewQ === "setup") viewQ = "simulation";
+      if (viewQ === "settings") {
+        viewQ = "simulation";
+        ui.simTab = "settings";
+      }
       if (viewQ) ui.view = viewQ;
     } catch (err) {}
+    try {
+      ui.savedLoadOpen = ui.view === "dashboard" && sessionStorage.getItem(SAVED_LOAD_KEY) !== "1";
+    } catch (err) {
+      ui.savedLoadOpen = ui.view === "dashboard";
+    }
     renderMain();
     if (ui.loadError) {
       document.getElementById("saved").textContent = "저장 데이터를 읽지 못해 새로 시작합니다";

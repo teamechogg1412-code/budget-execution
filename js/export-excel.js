@@ -84,6 +84,7 @@
       [s("기타 프로젝트 직접비"), won(otherProjectDirect), s("진행비·밥차 제외. 수동 직접비+프로젝트분류 수수료")],
       [s("손익비용 합계"), won(k.pnlExpense), s("월별현금 손익비용 합계와 같아야 함")],
       [s("보증금+자산"), won(k.fundingOut), s("손익 아님")],
+      [s("대표 배당"), won(k.dividend), s("손익 아님. 세후 이익잉여금 인출")],
       [s("추정 법인세 등"), won(k.tax), s("손익비용 아님. 기간 손익 기준 참고치. 신고용 아님")],
       [s("영업이익"), won(k.operatingProfit), s("기간 입금 − 손익비용")],
       [s("최저 잔액"), won(k.minClosing), s(k.minMonth || "")],

@@ -1241,6 +1241,8 @@
           "bonusAmount": 0,
           "bonusMonth": null,
           "dividendAmount": 0,
+          "dividendRate": 0,
+          "dividendMode": "amount",
           "dividendMonth": null
         },
         "personalTax": {
@@ -1450,7 +1452,7 @@
     },
     {
       "id": "0491a8eb-17d4-4c66-9ca7-580946fe1264",
-      "name": "일반 스텝 차량",
+      "name": "스텝 차량",
       "kind": "staff",
       "deposit": 10000000,
       "monthlyRent": 800000,

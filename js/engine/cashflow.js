@@ -6,6 +6,27 @@
     return (map[month] && App.Money.roundWon(map[month].total)) || 0;
   }
 
+  function monthCashOut(row) {
+    return App.Money.roundWon(
+      App.Money.roundWon(row.pnlExpense) +
+      App.Money.roundWon(row.deposits) +
+      App.Money.roundWon(row.capex) +
+      App.Money.roundWon(row.taxCashOut) +
+      App.Money.roundWon(row.vatSettlement) +
+      App.Money.roundWon(row.dividend) +
+      App.Money.roundWon(row.profitShare)
+    );
+  }
+
+  function applyMonthClosing(row) {
+    row.cashOut = monthCashOut(row);
+    row.closing = App.Money.roundWon(
+      row.opening + row.inflow + row.otherInflow + App.Money.roundWon(row.vatOutput) - row.cashOut
+    );
+    row.belowZero = row.closing < 0;
+    return row;
+  }
+
   function calculateMonthlyCashFlow(state, parts) {
     var months = parts.months;
     var flows = [];
@@ -51,10 +72,8 @@
 
       var pnlExpense = payroll + insurance + severance + meal + recurring + support + dayBased +
         projectDirect + projectExpense + lunchTruck + fees + revenueFees + oneTimeOpEx;
-      var cashOut = pnlExpense + deposits + capex + taxCashOut + vatSettlement;
-      var closing = opening + inflow + otherInflow + vatOutput - cashOut;
 
-      flows.push({
+      var row = {
         month: month,
         opening: opening,
         inflow: inflow,
@@ -99,13 +118,18 @@
         vatOutput: vatOutput,
         vatSettlement: vatSettlement,
         vatBalance: App.Money.roundWon((vat.byMonth && vat.byMonth[month] && vat.byMonth[month].balance) || 0),
-        cashOut: cashOut,
+        dividend: 0,
+        profitShare: 0,
+        cashOut: 0,
         pnlExpense: pnlExpense,
-        closing: closing,
-        belowZero: closing < 0,
-        belowSafety: closing < App.Money.roundWon(state.profile.safetyCash)
-      });
-      opening = closing;
+        closing: 0,
+        belowZero: false,
+        belowSafety: false
+      };
+      applyMonthClosing(row);
+      row.belowSafety = row.closing < App.Money.roundWon(state.profile.safetyCash);
+      flows.push(row);
+      opening = row.closing;
     });
     return flows;
   }
@@ -146,9 +170,7 @@
       row.taxCashOut = parts.total;
       row.corporateTaxCashOut = parts.corporate;
       row.localIncomeTaxCashOut = parts.local;
-      row.cashOut = row.pnlExpense + row.deposits + row.capex + row.taxCashOut + (row.vatSettlement || 0);
-      row.closing = row.opening + row.inflow + row.otherInflow + (row.vatOutput || 0) - row.cashOut;
-      row.belowZero = row.closing < 0;
+      applyMonthClosing(row);
       nextOpening = row.closing;
     }
     return flows;
@@ -182,6 +204,49 @@
       };
     });
     return applyTaxCashOutMap(flows, map);
+  }
+
+  function applyCashPayments(flows, payments, field) {
+    (flows || []).forEach(function (row) { row[field] = 0; });
+    var byMonth = {};
+    (payments || []).forEach(function (p) {
+      if (!p || !p.month || !p.amount) return;
+      byMonth[p.month] = App.Money.roundWon((byMonth[p.month] || 0) + App.Money.roundWon(p.amount));
+    });
+    var firstIdx = -1;
+    var i;
+    for (i = 0; i < (flows || []).length; i++) {
+      if (byMonth[flows[i].month]) { firstIdx = i; break; }
+    }
+    if (firstIdx < 0) return flows;
+    var nextOpening = null;
+    for (var j = firstIdx; j < flows.length; j++) {
+      var row = flows[j];
+      if (nextOpening !== null) row.opening = nextOpening;
+      row[field] = App.Money.roundWon(byMonth[row.month] || 0);
+      applyMonthClosing(row);
+      nextOpening = row.closing;
+    }
+    return flows;
+  }
+
+  function applyOwnerDividend(state, flows, ctx) {
+    var months = (flows || []).map(function (row) { return row.month; });
+    var payout = App.Defaults.resolveOwnerDividend
+      ? App.Defaults.resolveOwnerDividend(state, months, ctx)
+      : { amount: 0, month: null, payments: [] };
+    var payments = (payout.payments && payout.payments.length)
+      ? payout.payments
+      : (payout.amount && payout.month ? [{ month: payout.month, amount: payout.amount }] : []);
+    return applyCashPayments(flows, payments, "dividend");
+  }
+
+  function applyOwnerProfitShare(state, flows) {
+    var months = (flows || []).map(function (row) { return row.month; });
+    var payout = App.Defaults.resolveOwnerProfitShare
+      ? App.Defaults.resolveOwnerProfitShare(state, months)
+      : { amount: 0, payments: [] };
+    return applyCashPayments(flows, payout.payments || [], "profitShare");
   }
 
   function calculateMinimumCashBalance(flows) {
@@ -233,9 +298,12 @@
     };
   }
 
+  App.Engine.monthCashOut = monthCashOut;
   App.Engine.calculateMonthlyCashFlow = calculateMonthlyCashFlow;
   App.Engine.applyTaxCashOut = applyTaxCashOut;
   App.Engine.applyCorporateTaxCashOut = applyCorporateTaxCashOut;
+  App.Engine.applyOwnerDividend = applyOwnerDividend;
+  App.Engine.applyOwnerProfitShare = applyOwnerProfitShare;
   App.Engine.calculateMinimumCashBalance = calculateMinimumCashBalance;
   App.Engine.calculateRequiredWorkingCapital = calculateRequiredWorkingCapital;
   App.Engine.calculateBurnRate = calculateBurnRate;

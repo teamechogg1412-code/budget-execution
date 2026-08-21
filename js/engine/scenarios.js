@@ -165,7 +165,6 @@
     });
     if (!Object.keys(salaryYears).length && salary) addToYearBucket(buckets, fallbackYear, "earnedGross", salary);
     if (bonus) addToYearBucket(buckets, monthYear(state.settings.scenarios.soloAgency.ownerPayout.bonusMonth, fallbackYear), "earnedGross", bonus);
-    if (dividend) addToYearBucket(buckets, monthYear(state.settings.scenarios.soloAgency.ownerPayout.dividendMonth, fallbackYear), "otherIncome", dividend);
     var details = Object.keys(buckets).sort().map(function (year) {
       var b = buckets[year];
       var gross = App.Money.roundWon(b.earnedGross + b.businessIncome + b.otherIncome);
@@ -185,15 +184,115 @@
     var payout = cfg.ownerPayout || {};
     var salary = ownerSalaryFromLedger(soloResult, payout.salaryEmployeeId);
     var bonus = App.Money.roundWon(payout.bonusAmount);
-    var dividend = App.Money.roundWon(payout.dividendAmount);
-    var actorGross = App.Money.roundWon(salary + bonus + dividend);
+    var dividendPayout = App.Defaults.resolveOwnerDividend
+      ? App.Defaults.resolveOwnerDividend(state, soloResult && soloResult.months, {
+          afterTaxNet: (k.taxDetail && k.taxDetail.afterTaxNet) != null ? k.taxDetail.afterTaxNet : k.profitAfterTax,
+          operatingProfit: k.operatingProfit,
+          byYear: k.taxDetail && k.taxDetail.byYear,
+          revenue: k.revenue
+        })
+      : { amount: App.Money.roundWon(payout.dividendAmount), month: payout.dividendMonth, mode: "amount", rate: 0, payments: [] };
+    var dividend = App.Money.roundWon(dividendPayout.amount);
+    var dividendPayments = dividendPayout.payments || [];
+    var dividendMode = dividendPayout.mode || "amount";
+    var dividendTaxParts = App.Defaults.ownerDividendWithholding
+      ? App.Defaults.ownerDividendWithholding(dividend)
+      : { national: 0, local: 0, total: 0, label: "배당소득세 (15.4%)" };
+    var profitSharePayout = App.Defaults.resolveOwnerProfitShare
+      ? App.Defaults.resolveOwnerProfitShare(state, soloResult && soloResult.months)
+      : { amount: 0, payments: [], tax: { total: 0, label: "사업소득세 (3.3%)" } };
+    var profitShare = App.Money.roundWon(profitSharePayout.amount);
+    var profitSharePayments = profitSharePayout.payments || [];
+    var profitShareTaxParts = profitSharePayout.tax || (
+      App.Defaults.ownerProfitShareWithholding
+        ? App.Defaults.ownerProfitShareWithholding(profitShare)
+        : { national: 0, local: 0, total: 0, label: "사업소득세 (3.3%)" }
+    );
+    var earnedGross = App.Money.roundWon(salary + bonus);
+    var actorGross = App.Money.roundWon(earnedGross + dividend + profitShare);
     var taxSettings = App.Engine.copyTaxSettings(
       App.Defaults.personalTaxForScenario(state, "soloAgency"),
-      { earnedGross: App.Money.roundWon(salary + bonus), businessIncome: 0, otherIncome: dividend }
+      { earnedGross: earnedGross, businessIncome: 0, otherIncome: 0 }
     );
+    var simYears = App.TaxYear && App.TaxYear.yearsFromMonths
+      ? App.TaxYear.yearsFromMonths((soloResult && soloResult.months) || [])
+      : [];
+    if (simYears.length) taxSettings.year = simYears[simYears.length - 1];
+    var autoMode = (taxSettings.mode || "auto") === "auto";
     var taxDetail = calculateSoloPersonalTaxDetail(
-      state, soloResult, payout.salaryEmployeeId, salary, bonus, dividend, actorGross, taxSettings
+      state, soloResult, payout.salaryEmployeeId, salary, bonus, 0,
+      autoMode ? earnedGross : actorGross, taxSettings
     );
+    if (dividend && autoMode) {
+      taxDetail.otherIncome = App.Money.roundWon((taxDetail.otherIncome || 0) + dividend);
+      taxDetail.payoutTaxLabel = dividendTaxParts.label;
+      taxDetail.payoutIncomeLabel = "대표 배당";
+      taxDetail.totalPersonalTax = App.Money.roundWon(taxDetail.totalPersonalTax + dividendTaxParts.total);
+      taxDetail.afterTaxIncome = App.Money.roundWon(
+        App.Money.roundWon(taxDetail.earnedGross + taxDetail.businessIncome + taxDetail.otherIncome) -
+        taxDetail.totalPersonalTax
+      );
+      dividendPayments.forEach(function (p) {
+        if (!p.amount) return;
+        var parts = App.Defaults.ownerDividendWithholding(p.amount);
+        var divYear = monthYear(p.month, Number(taxSettings.year) || 2026);
+        var yearRow = ((taxDetail.years || []).filter(function (d) { return Number(d.year) === Number(divYear); })[0]) || null;
+        if (!yearRow) {
+          yearRow = App.Engine.calculatePersonalTaxDetail(0, {
+            mode: "auto", year: divYear, useLinkedIncome: true, incomeType: "earned"
+          });
+          taxDetail.years = (taxDetail.years || []).concat([yearRow]).sort(function (a, b) {
+            return Number(a.year) - Number(b.year);
+          });
+        }
+        yearRow.otherIncome = App.Money.roundWon((yearRow.otherIncome || 0) + p.amount);
+        yearRow.dividendTax = App.Money.roundWon((yearRow.dividendTax || 0) + parts.total);
+        yearRow.payoutTaxLabel = parts.label;
+        yearRow.payoutIncomeLabel = "대표 배당";
+        yearRow.totalPersonalTax = App.Money.roundWon(yearRow.totalPersonalTax + parts.total);
+        yearRow.afterTaxIncome = App.Money.roundWon(
+          App.Money.roundWon(yearRow.earnedGross + yearRow.businessIncome + yearRow.otherIncome) -
+          yearRow.totalPersonalTax
+        );
+      });
+    }
+    if (profitShare && autoMode) {
+      taxDetail.businessIncome = App.Money.roundWon((taxDetail.businessIncome || 0) + profitShare);
+      taxDetail.profitShareTaxLabel = profitShareTaxParts.label;
+      taxDetail.totalPersonalTax = App.Money.roundWon(taxDetail.totalPersonalTax + profitShareTaxParts.total);
+      taxDetail.afterTaxIncome = App.Money.roundWon(
+        App.Money.roundWon(taxDetail.earnedGross + taxDetail.businessIncome + taxDetail.otherIncome) -
+        taxDetail.totalPersonalTax
+      );
+      profitSharePayments.forEach(function (p) {
+        if (!p.amount) return;
+        var parts = App.Defaults.ownerProfitShareWithholding
+          ? App.Defaults.ownerProfitShareWithholding(p.amount)
+          : { total: 0, label: "사업소득세 (3.3%)" };
+        var shareYear = monthYear(p.month, Number(taxSettings.year) || 2026);
+        var yearRow = ((taxDetail.years || []).filter(function (d) { return Number(d.year) === Number(shareYear); })[0]) || null;
+        if (!yearRow) {
+          yearRow = App.Engine.calculatePersonalTaxDetail(0, {
+            mode: "auto", year: shareYear, useLinkedIncome: true, incomeType: "earned"
+          });
+          taxDetail.years = (taxDetail.years || []).concat([yearRow]).sort(function (a, b) {
+            return Number(a.year) - Number(b.year);
+          });
+        }
+        yearRow.businessIncome = App.Money.roundWon((yearRow.businessIncome || 0) + p.amount);
+        yearRow.profitShareTax = App.Money.roundWon((yearRow.profitShareTax || 0) + parts.total);
+        yearRow.profitShareTaxLabel = parts.label;
+        yearRow.totalPersonalTax = App.Money.roundWon(yearRow.totalPersonalTax + parts.total);
+        yearRow.afterTaxIncome = App.Money.roundWon(
+          App.Money.roundWon(yearRow.earnedGross + yearRow.businessIncome + yearRow.otherIncome) -
+          yearRow.totalPersonalTax
+        );
+      });
+    }
+    if (!autoMode) {
+      dividendTaxParts = { national: 0, local: 0, total: 0 };
+      profitShareTaxParts = { national: 0, local: 0, total: 0, label: "사업소득세 (3.3%)" };
+    }
     var personalTax = taxDetail.totalPersonalTax;
     var actorNet = App.Money.roundWon(actorGross - personalTax);
     var corpCash = App.Money.roundWon(k.endClosing);
@@ -290,10 +389,22 @@
       commonActorSupportValue: commonActorSupportValue,
       uniqueBenefitValue: uniqueBenefitValue,
       ownerIncentiveAmount: ownerIncentive,
+      ownerDividendAmount: dividend,
+      ownerDividendMonth: dividendPayout.month || null,
+      ownerDividendPayments: dividendPayments,
+      ownerDividendTax: dividendTaxParts.total,
+      ownerPayoutTaxLabel: dividendTaxParts.label || "배당소득세 (15.4%)",
+      ownerDividendMode: dividendMode,
+      ownerDividendRate: dividendPayout.rate || 0,
+      ownerProfitShareAmount: profitShare,
+      ownerProfitShareTax: profitShareTaxParts.total,
+      ownerProfitShareTaxLabel: profitShareTaxParts.label || "사업소득세 (3.3%)",
+      ownerProfitShareWorkRate: profitSharePayout.workRate || 0,
+      ownerProfitShareSalesRate: profitSharePayout.salesRate || 0,
       pendingCorporateLocal: pendingCorporateLocal,
       corporateCashForEconomicValue: corporateCashForEconomicValue,
       corporateAfterTaxNet: corporateAfterTaxNet,
-      controlledEconomicValue: App.Money.roundWon(actorNet + corporateAfterTaxNet + uniqueBenefitValue),
+      controlledEconomicValue: App.Money.roundWon(actorNet + corporateAfterTaxNet - dividend - profitShare + uniqueBenefitValue),
       liquidationTaxRate: liquidationTaxRate,
       pendingTaxLiability: pendingTaxLiability,
       corpCashAfterPendingTax: corpCashAfterPendingTax,

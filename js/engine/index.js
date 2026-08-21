@@ -185,6 +185,17 @@
     var profit = App.Engine.calculateProfit(flows, state.projects, revenue);
     var tax = App.Engine.calculateCorporateTaxByYears(flows, state.settings.tax);
     flows = App.Engine.applyCorporateTaxCashOut(flows, tax, state.settings.tax);
+    if (App.Engine.applyOwnerDividend) {
+      flows = App.Engine.applyOwnerDividend(state, flows, {
+        afterTaxNet: tax.afterTaxNet,
+        operatingProfit: profit.operatingProfit,
+        byYear: tax.byYear,
+        revenue: profit.revenue
+      });
+    }
+    if (App.Engine.applyOwnerProfitShare) {
+      flows = App.Engine.applyOwnerProfitShare(state, flows);
+    }
     if (App.Engine.applyCorporateTaxPending) {
       flows = App.Engine.applyCorporateTaxPending(flows, tax, state.settings.tax);
     }
@@ -228,6 +239,8 @@
       deposits: App.Money.sumBy(flows, function (r) { return r.deposits; }),
       capex: App.Money.sumBy(flows, function (r) { return r.capex; }),
       fundingOut: App.Money.sumBy(flows, function (r) { return r.deposits + r.capex; }),
+      dividend: App.Money.sumBy(flows, function (r) { return r.dividend; }),
+      profitShare: App.Money.sumBy(flows, function (r) { return r.profitShare; }),
       revenue: profit.revenue,
       pnlExpense: profit.pnlExpense,
       operatingProfit: profit.operatingProfit,

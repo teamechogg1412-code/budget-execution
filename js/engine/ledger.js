@@ -221,6 +221,45 @@
       ? withSection(makeGroup("funding", "자산·보증금", fundingRows, months, "funding"), "현금성/자산 이동")
       : null;
 
+    var dividendValues = emptyValues(months);
+    (flows || []).forEach(function (row) {
+      addAmount(dividendValues, row.month, -App.Money.roundWon(row.dividend));
+    });
+    var dividendGroup = sumValues(dividendValues)
+      ? withSection(makeGroup("dividend", "배당", [
+          finishRow("owner-dividend", "대표 배당", dividendValues, "funding")
+        ], months, "funding"), "현금성/자산 이동")
+      : null;
+
+    var profitShareValues = emptyValues(months);
+    var profitShareWorkValues = emptyValues(months);
+    var profitShareSalesValues = emptyValues(months);
+    (flows || []).forEach(function (row) {
+      addAmount(profitShareValues, row.month, -App.Money.roundWon(row.profitShare));
+    });
+    if (App.Defaults.resolveOwnerProfitShare) {
+      var share = App.Defaults.resolveOwnerProfitShare(state, months);
+      (share.workPayments || []).forEach(function (p) {
+        if (p.month) addAmount(profitShareWorkValues, p.month, -App.Money.roundWon(p.amount));
+      });
+      (share.salesPayments || []).forEach(function (p) {
+        if (p.month) addAmount(profitShareSalesValues, p.month, -App.Money.roundWon(p.amount));
+      });
+    }
+    var profitShareRows = [];
+    if (sumValues(profitShareWorkValues)) {
+      profitShareRows.push(finishRow("owner-profit-work", "작품 수익배분", profitShareWorkValues, "funding"));
+    }
+    if (sumValues(profitShareSalesValues)) {
+      profitShareRows.push(finishRow("owner-profit-sales", "영업 수익배분", profitShareSalesValues, "funding"));
+    }
+    if (!profitShareRows.length && sumValues(profitShareValues)) {
+      profitShareRows.push(finishRow("owner-profit-share", "수익배분", profitShareValues, "funding"));
+    }
+    var profitShareGroup = profitShareRows.length
+      ? withSection(makeGroup("profit-share", "수익배분", profitShareRows, months, "funding"), "현금성/자산 이동")
+      : null;
+
     var otherInRows = collectFromByMonth((parts.otherInflows || {}).byMonth, months, function (it) {
       return "oin-" + (it.id || it.name);
     }, function (it) { return it.name || "기타 입금"; }, 1);
@@ -315,8 +354,9 @@
           addAmount(incentiveValues, m, -App.Money.roundWon(it.incentiveAmount));
         });
       });
-      var label = emp.name || emp.role || "직원";
-      if (emp.role && emp.name && emp.role !== emp.name) label = emp.name + " / " + emp.role;
+      var label = App.Defaults.employeeListLabel
+        ? App.Defaults.employeeListLabel(emp)
+        : (emp.name || emp.role || "직원");
       payRows.push(finishRow("emp-" + emp.id, label, salaryValues));
       var incRow = finishRow("emp-" + emp.id + "-incentive", employeeIncentiveLabel(emp), incentiveValues);
       incRow.showZero = true;
@@ -419,6 +459,8 @@
     groups.push(withSection(makeSummaryGroup("operating-profit", "영업이익", operatingValues, "profit-summary"), "영업이익"));
 
     if (fundingGroup) groups.push(fundingGroup);
+    if (dividendGroup) groups.push(dividendGroup);
+    if (profitShareGroup) groups.push(profitShareGroup);
     if (otherInGroup) groups.push(otherInGroup);
 
     var incomeValues = emptyValues(months);

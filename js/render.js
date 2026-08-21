@@ -145,7 +145,8 @@
   }
 
   function familyBadge(label) {
-    return '<span class="cat-badge cat-badge-family">' + esc(label) + "</span>";
+    var extra = label === "작품" ? " cat-badge-work" : label === "영업" ? " cat-badge-sales" : "";
+    return '<span class="cat-badge' + extra + ' cat-badge-family">' + esc(label) + "</span>";
   }
 
   function fundingAccountSubject(kind, row) {
@@ -199,8 +200,9 @@
     var html = "";
     html += '<span class="cost-family">' + familyBadge(opts.family) + "</span>";
     html += '<span class="cost-account">' + catBadge(null, opts.account, { static: true }) + "</span>";
-    html += '<span class="cost-name"' + (key ? ' data-computed="cost-name" data-item="' + esc(key) + '"' : "") + ">" +
-      (opts.nameHtml || esc(opts.name || "항목")) + "</span>";
+    html += '<span class="cost-name"' + (key ? ' data-computed="cost-name" data-item="' + esc(key) + '"' : "") + ">";
+    html += '<i class="chev' + (opts.chevron === false ? " chev-ghost" : "") + '" aria-hidden="true"></i>';
+    html += (opts.nameHtml || esc(opts.name || "항목")) + "</span>";
     html += '<span class="cost-amt"' + (key ? ' data-computed="cost-amt" data-item="' + esc(key) + '"' : "") + ">" +
       (opts.amountHtml != null ? opts.amountHtml : esc(opts.amount || "")) + "</span>";
     html += '<span class="cost-unit"' + (key ? ' data-computed="cost-unit" data-item="' + esc(key) + '"' : "") + ">" +
@@ -346,16 +348,26 @@
     });
   }
 
-  function recGroupSummaryText(items, groupId, state) {
+  function recGroupSummaryParts(items, groupId, state) {
     var start = state && state.profile && state.profile.startMonth;
     var end = state && state.profile && state.profile.endMonth;
-    var text = recGroupCount(items, groupId) + "건 · 월 " + App.Format.formatWon(recMonthlySum(items, groupId));
+    var n = recGroupCount(items, groupId);
+    var monthly = recMonthlySum(items, groupId);
+    var period = n + "건";
     if (recGroupHasOverrides(items, groupId)) {
       var periodSum = recGroupAppliedTotal(items, groupId, start, end);
-      if (periodSum) text += " · 기간합 " + App.Format.formatWon(periodSum);
-      else text += " · 월별 변동 있음";
+      period += periodSum ? " · 기간합 " + App.Format.formatWon(periodSum) : " · 월별 변동 있음";
     }
-    return text;
+    return {
+      amount: App.Format.formatWon(monthly),
+      unit: "월",
+      period: period
+    };
+  }
+
+  function recGroupSummaryText(items, groupId, state) {
+    var p = recGroupSummaryParts(items, groupId, state);
+    return p.period + " · " + p.unit + " " + p.amount;
   }
 
   function recGroupCount(items, groupId) {
@@ -398,7 +410,15 @@
     return "반영 " + s.n + "건 · " + App.Format.formatWon(s.sum);
   }
 
-  function empTitle(e) {
+  function costGrandTotalText(rows, corporateStatus) {
+    var s = lineStats(rows, corporateStatus);
+    return "전체 합계 " + App.Format.formatWon(s.sum);
+  }
+
+  function empTitle(e, genericOwner) {
+    if (genericOwner && App.Defaults.isOwnerEmployee && App.Defaults.isOwnerEmployee(e)) {
+      return App.Defaults.employeeListLabel(e);
+    }
     var n = ((e && e.name) || "").trim();
     var r = ((e && e.role) || "").trim();
     if (n && r && n !== r) return n + " / " + r;
@@ -420,10 +440,12 @@
       html += '<summary><div class="cost-sec-head cost-row-list">';
       html += '<span class="cost-group-title"><span class="chev" aria-hidden="true"></span><b>' +
         esc(opts.title) + "</b></span>";
-      html += '<span class="cost-amt"></span>';
-      html += '<span class="cost-unit"></span>';
+      html += '<span class="cost-amt"' + (opts.id ? ' data-computed="cost-sec-amt" data-sec="' + esc(opts.id) + '"' : "") +
+        ">" + esc(opts.amount || "") + "</span>";
+      html += '<span class="cost-unit"' + (opts.id ? ' data-computed="cost-sec-unit" data-sec="' + esc(opts.id) + '"' : "") +
+        ">" + esc(opts.unit || "") + "</span>";
       html += '<span class="cost-period cost-sec-sum" data-computed="cost-sec" data-sec="' +
-        esc(opts.id) + '">' + esc(opts.summary || "") + "</span>";
+        esc(opts.id) + '">' + esc(opts.period || opts.summary || "") + "</span>";
       if (opts.addAction) {
         html += '<span class="cost-flag"><button type="button" class="btn" data-action="' +
           esc(opts.addAction) + '"' + (opts.addAttrs || "") + ">" +
@@ -676,7 +698,7 @@
         key: key,
         family: labels.family,
         account: labels.account,
-        name: empTitle(e),
+        name: empTitle(e, linked),
         amount: empAmountCellText(e),
         unit: "월",
         period: itemPeriodLabel(e),
@@ -867,7 +889,8 @@
         amount: App.Format.formatWon(autoSupportMonthlyAmount(p, state)),
         unit: "월",
         period: "전체기간",
-        status: "포함"
+        status: "포함",
+        chevron: false
       });
       html += "</div></div>";
     });
@@ -996,7 +1019,9 @@
     return renderCostSection({
       id: "welfare",
       title: "복리후생비",
-      summary: "기준월 " + App.Format.formatWon(welfareAmt) + " /월(월별 변동) · 식대 + 회식·야근 " + pctView(extraRate) + "% × " + multiplier,
+      amount: App.Format.formatWon(welfareAmt),
+      unit: "월·변동",
+      period: "식대 + 회식·야근 " + pctView(extraRate) + "% × " + multiplier,
       extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
       open: isSecOpen(ui, "welfare"),
       body: list
@@ -1015,16 +1040,19 @@
     if (!root || !root.querySelector(".view-costs")) return;
     var start = state.profile.startMonth;
     setComputedText(root, '[data-computed="cost-sec"][data-sec="startup"]',
-      lineSecText(state.startupExpenses, (state.settings && state.settings.corporateStatus) || "new"));
+      costGrandTotalText(state.startupExpenses, (state.settings && state.settings.corporateStatus) || "new"));
     setComputedText(root, '[data-computed="cost-sec"][data-sec="deposits"]', lineSecText(fundingDepositRows(state)));
     setComputedText(root, '[data-computed="cost-sec"][data-sec="assets"]', lineSecText(state.assets));
-    setComputedText(root, '[data-computed="cost-sec"][data-sec="payroll"]',
-      "인건비 합계 " + App.Format.formatWon(salarySum(state.employees)) + " · 조직 설정 연동");
-    setComputedText(root, '[data-computed="cost-sec"][data-sec="sga-parent"]',
-      "월 " + App.Format.formatWon(sgaMonthlyTotal(state)));
+    setComputedText(root, '[data-computed="cost-sec-amt"][data-sec="payroll"]',
+      App.Format.formatWon(salarySum(state.employees)));
+    setComputedText(root, '[data-computed="cost-sec-unit"][data-sec="payroll"]', "월");
+    setComputedText(root, '[data-computed="cost-sec"][data-sec="payroll"]', "조직 설정 연동");
+    setComputedText(root, '[data-computed="cost-sec"][data-sec="sga-parent"]', "");
     ["rent", "marketing", "sga"].forEach(function (gid) {
-      setComputedText(root, '[data-computed="cost-sec"][data-sec="recurring-' + gid + '"]',
-        recGroupSummaryText(state.recurringExpenses, gid, state));
+      var parts = recGroupSummaryParts(state.recurringExpenses, gid, state);
+      setComputedText(root, '[data-computed="cost-sec-amt"][data-sec="recurring-' + gid + '"]', parts.amount);
+      setComputedText(root, '[data-computed="cost-sec-unit"][data-sec="recurring-' + gid + '"]', parts.unit);
+      setComputedText(root, '[data-computed="cost-sec"][data-sec="recurring-' + gid + '"]', parts.period);
     });
     setComputedText(root, '[data-computed="cost-sec"][data-sec="inflows"]', "합계 " + App.Format.formatWon(inflowSum(state.otherInflows)));
 
@@ -1080,7 +1108,7 @@
     (state.employees || []).forEach(function (e, i) {
       var key = costItemKey("employees", e, i);
       patchItem(key, e.include !== false, {
-        name: empTitle(e),
+        name: empTitle(e, true),
         amt: empAmountCellText(e),
         period: itemPeriodLabel(e)
       });
@@ -1213,66 +1241,8 @@
     })[0];
   }
 
-  function sumByYear(values, year) {
-    var total = 0;
-    Object.keys(values || {}).forEach(function (m) {
-      if (App.TaxYear.yearOf(m) === Number(year)) total += App.Money.roundWon(values[m]);
-    });
-    return App.Money.roundWon(total);
-  }
-
-  function groupYearAmount(group, year) {
-    return group ? sumByYear(group.subtotal && group.subtotal.values, year) : 0;
-  }
-
   function groupTotalAmount(group) {
     return group && group.subtotal ? App.Money.roundWon(group.subtotal.total) : 0;
-  }
-
-  function projectContractYear(project, fallbackYear) {
-    var month = App.Month.normalizeMonth(project && project.shootStartMonth) ||
-      App.Month.normalizeMonth(project && project.shootEndMonth);
-    if (!month) {
-      var pays = ((project && project.payments) || []).map(function (p) {
-        return App.Month.normalizeMonth(p && p.expectedMonth);
-      }).filter(Boolean).sort();
-      month = pays[0];
-    }
-    return App.TaxYear.yearOf(month) || fallbackYear || 0;
-  }
-
-  function firstShortageMonth(result) {
-    var rows = (result && result.months) || [];
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i] && rows[i].closing < 0) return rows[i].month;
-    }
-    return "";
-  }
-
-  function dashMoneyCell(amount, totalCol) {
-    return '<td class="num' + (totalCol ? " total-col" : "") + '" title="' +
-      esc(App.Format.formatWon(amount)) + '">' + esc(formatDashMoney(amount)) + "</td>";
-  }
-
-  function dashPctCell(rate, totalCol) {
-    var text = rate == null ? "—" : App.Format.formatPct(rate);
-    return '<td class="num' + (totalCol ? " total-col" : "") + '">' + esc(text) + "</td>";
-  }
-
-  function renderDashYearTable(years, rows) {
-    var html = '<div class="dash-table-wrap"><table class="dash-year-table"><thead><tr><th></th>';
-    (years || []).forEach(function (y) { html += '<th class="num">' + esc(String(y)) + "</th>"; });
-    html += '<th class="num total-col">전체</th></tr></thead><tbody>';
-    (rows || []).forEach(function (row) {
-      html += "<tr" + (row.strong ? ' class="dash-strong"' : "") + "><th>" + esc(row.label) + "</th>";
-      (years || []).forEach(function (y) {
-        html += row.pct ? dashPctCell(row.values[y]) : dashMoneyCell(row.values[y] || 0);
-      });
-      html += row.pct ? dashPctCell(row.values.all, true) : dashMoneyCell(row.values.all || 0, true);
-      html += "</tr>";
-    });
-    html += "</tbody></table></div>";
-    return html;
   }
 
   function dashMetric(label, amount, cls) {
@@ -1281,76 +1251,43 @@
       esc(formatDashMoney(amount)) + "</b></div>";
   }
 
-  function dashboardScaleRows(state, result, years) {
-    var k = result.kpis;
-    var firstYear = years[0];
-    var contracts = {};
-    years.forEach(function (y) { contracts[y] = 0; });
-    (state.projects || []).forEach(function (p) {
-      if (!p || p.status === "cancelled") return;
-      var year = projectContractYear(p, firstYear);
-      var amt = App.Money.roundWon(p.contractAmount);
-      if (contracts[year] == null) return;
-      contracts[year] = App.Money.roundWon(contracts[year] + amt);
-    });
-    var workG = dashLedgerGroup(result, "revenue-work");
-    var salesG = dashLedgerGroup(result, "revenue-sales");
-    var work = { all: groupTotalAmount(workG) };
-    var sales = { all: groupTotalAmount(salesG) };
-    var inflow = { all: App.Money.roundWon(k.inflowInPeriod) };
-    years.forEach(function (y) {
-      work[y] = groupYearAmount(workG, y);
-      sales[y] = groupYearAmount(salesG, y);
-      inflow[y] = App.Money.sumBy((result.months || []).filter(function (r) {
-        return App.TaxYear.yearOf(r.month) === Number(y);
-      }), function (r) { return r.inflow; });
-    });
-    return [
-      { label: "계약 총액", values: Object.assign({ all: App.Money.roundWon(k.contractTotal) }, contracts) },
-      { label: "입금 예정", values: inflow },
-      { label: "작품 수입", values: work },
-      { label: "영업 수입", values: sales }
-    ];
+  function renderSavedLoadGate(state) {
+    var seed = (App.Sample && App.Sample.load) ? App.Sample.load() : state;
+    var p = (seed && seed.profile) || {};
+    var title = (seed.meta && (seed.meta.title || seed.meta.label)) || p.actorName || "최종 예산안";
+    var period = (App.Format.formatMonthIso(p.startMonth) || p.startMonth || "") +
+      " ~ " + (App.Format.formatMonthIso(p.endMonth) || p.endMonth || "");
+    var html = '<div class="view-dashboard dash-load-screen">';
+    html += '<div class="dash-load-card">';
+    html += "<h2>저장된 값 불러오기</h2>";
+    html += '<p class="muted">' + esc(title) + (period.trim() !== "~" ? " · " + esc(period) : "") +
+      " 최종 예산안을 불러옵니다.</p>";
+    html += '<div class="dash-load-actions">';
+    html += '<button type="button" class="btn primary" data-action="load-saved">저장된 값 불러오기</button>';
+    html += '<button type="button" class="btn" data-action="import">JSON 파일에서 가져오기</button>';
+    html += '<button type="button" class="btn btn-quiet" data-action="dismiss-saved-load">이 화면으로 계속</button>';
+    html += "</div>";
+    var budgets = (App.Store && App.Store.listBudgets) ? App.Store.listBudgets() : [];
+    if (budgets.length) {
+      html += '<div class="dash-load-local">';
+      html += '<p class="muted small">이 브라우저에 저장된 예산안</p>';
+      budgets.slice(0, 5).forEach(function (b) {
+        html += '<button type="button" class="btn dash-load-local-item" data-action="switch-budget" data-id="' +
+          esc(b.id) + '">' + esc(b.name || "이름 없음") +
+          '<span class="muted small">' + esc(budgetPeriodLabel(b)) + "</span></button>";
+      });
+      html += "</div>";
+    }
+    html += "</div></div>";
+    return html;
   }
 
-  function dashboardPerformanceRows(result, years) {
-    var k = result.kpis;
-    var revG = dashLedgerGroup(result, "revenue-total");
-    var grossG = dashLedgerGroup(result, "gross-profit");
-    var opG = dashLedgerGroup(result, "operating-profit");
-    var taxByYear = (k.taxDetail && k.taxDetail.byYear) || {};
-    var revenue = { all: App.Money.roundWon(k.revenue) };
-    var gross = { all: groupTotalAmount(grossG) };
-    var operating = { all: App.Money.roundWon(k.operatingProfit) };
-    var tax = { all: App.Money.roundWon(k.tax) };
-    var afterTax = { all: App.Money.roundWon(k.profitAfterTax) };
-    var margin = { all: k.margin };
-    years.forEach(function (y) {
-      var rev = groupYearAmount(revG, y);
-      var op = groupYearAmount(opG, y);
-      var yearTax = taxByYear[y] || taxByYear[String(y)] || {};
-      var taxAmt = App.Money.roundWon(yearTax.totalTax);
-      revenue[y] = rev;
-      gross[y] = groupYearAmount(grossG, y);
-      operating[y] = op;
-      tax[y] = taxAmt;
-      afterTax[y] = App.Money.roundWon(op - taxAmt);
-      margin[y] = rev ? op / Math.abs(rev) : null;
-    });
-    return [
-      { label: "총 매출", values: revenue, strong: true },
-      { label: "매출총이익", values: gross },
-      { label: "영업이익", values: operating, strong: true },
-      { label: "영업이익률", values: margin, pct: true },
-      { label: "예상 법인세", values: tax },
-      { label: "세후이익", values: afterTax, strong: true }
-    ];
-  }
-
-  function renderDashboard(state, result) {
+  function renderDashboard(state, result, ui) {
+    if (ui && ui.savedLoadOpen) {
+      return renderSavedLoadGate(state);
+    }
     var k = result.kpis;
     var gap = revenueGapOf(state, result);
-    var years = App.TaxYear.yearsFromMonths(result.months || []);
     var html = '<div class="view-dashboard">';
     html += renderRevenueGapBanner(gap);
     var skipPayCodes = {
@@ -1370,92 +1307,33 @@
     html += renderDashHero(result);
     html += '<p class="muted small">기본 시드는 법인 설립·운영 예산 엑셀을 그대로 옮겨 둔 틀입니다. 배우명과 작품만 바꿔도 설립비·인건비·사무실·차량 구조는 같이 쓸 수 있습니다.</p>';
 
-    html += '<div class="card"><h2>사업 규모</h2>';
-    html += renderDashYearTable(years, dashboardScaleRows(state, result, years));
-    var side = [];
-    if (k.inflowBeforePeriod) {
-      side.push("기간 이전 입금 " + App.Format.formatWon(k.inflowBeforePeriod) + " · 최초현금에 포함된 것으로 봄");
-    }
-    if (k.inflowAfterPeriod) {
-      side.push("기간 이후 예정 " + App.Format.formatWon(k.inflowAfterPeriod));
-    }
-    if (side.length) html += '<p class="muted small dash-side-note">' + esc(side.join(" · ")) + "</p>";
-    html += "</div>";
-
-    var additionalFunding = App.Money.roundWon(k.deficitCover);
-    var minimumStartingCash = App.Money.roundWon(k.initialCash + additionalFunding);
-    var shortageMonth = additionalFunding > 0 ? firstShortageMonth(result) : "";
     html += '<div class="dash-split">';
-    html += '<div class="card"><h2>자금 안전성</h2><div class="dash-metrics">';
-    html += dashMetric("현재 보유현금", k.initialCash);
-    html += dashMetric("최소 시작자금", minimumStartingCash,
-      additionalFunding > 0 ? "hero" : "hero good");
-    html += dashMetric("추가 필요자금", additionalFunding, additionalFunding > 0 ? "bad" : "good");
-    if (shortageMonth) {
-      html += '<div class="dash-metric bad"><span>자금 부족 예상 시점</span><b>' +
-        esc(App.Month.monthLabel(shortageMonth) || shortageMonth) + "</b></div>";
-    }
+    var cogsG = dashLedgerGroup(result, "cogs-total");
+    var grossG = dashLedgerGroup(result, "gross-profit");
+    var sgaG = dashLedgerGroup(result, "opex-sga-parent");
+    html += '<div class="card"><h2>손익계산서 (1배 기준)</h2>';
+    html += '<p class="muted small">전체 기간 누적, 굵직한 계정과목 소계만 반영합니다. 상세는 분석 &gt; 월별 분석에서 확인합니다.</p>';
+    html += scenarioBlockLine("총매출", k.revenue, { plus: true });
+    html += scenarioBlockLine("매출원가", groupTotalAmount(cogsG), { cost: true });
+    html += scenarioBlockLine("매출총이익", groupTotalAmount(grossG), { subtotal: true });
+    html += scenarioBlockLine("판관비", groupTotalAmount(sgaG), { cost: true });
+    html += scenarioBlockLine("영업이익", k.operatingProfit, { subtotal: true });
+    html += scenarioBlockLine("법인세", k.tax, { cost: true });
+    html += scenarioBlockLine("세후이익", k.profitAfterTax, { total: true });
     html += "</div>";
-    if (k.vatPendingLiability) {
-      html += '<div class="dash-metrics dash-metrics-vat">';
-      html += dashMetric("기간말 현금(통장 기준)", k.endClosing);
-      html += dashMetric("미납 VAT 예상액", k.vatPendingLiability);
-      html += dashMetric("세금 제외 가용현금", k.availableCashExVat,
-        k.availableCashExVat < 0 ? "bad" : "");
-      html += "</div>";
-      html += '<p class="muted small dash-side-note">기간말 현금에는 아직 신고·납부하지 않은 부가세 ' +
-        esc(App.Format.formatWon(k.vatPendingLiability)) +
-        "이 통장에 그대로 남아 있습니다. 실제 자유롭게 쓸 수 있는 돈은 세금 제외 가용현금입니다.</p>";
-    }
-    if (additionalFunding > 0) {
-      html += '<p class="cash-need-note">현재 <b>' +
-        esc(App.Format.formatWonAbout(k.initialCash).replace(/^약 /, "")) +
-        "</b> 보유 기준, 기간 중 자금이 마이너스가 되지 않으려면 <b>" +
-        esc(App.Format.formatWonAbout(additionalFunding)) + "</b>을 추가 확보해야 합니다.</p>";
-    } else {
-      html += '<p class="cash-need-note">현재 보유현금으로 시뮬레이션 기간의 운영자금을 충당할 수 있습니다.</p>';
-    }
-    if (k.fundingOut) {
-      html += '<p class="muted small dash-side-note">기간 중 자산·보증금 지출 ' +
-        esc(formatDashMoney(k.fundingOut)) + " · 손익이 아니라 현금 이동입니다.</p>";
-    }
-    html += cashChart(result) + "</div>";
 
-    var sga = App.Money.roundWon(k.pnlExpense - k.projectDirect - k.agencyFees);
-    html += '<div class="card"><h2>사업 성과</h2>';
-    html += renderDashYearTable(years, dashboardPerformanceRows(result, years));
-    html += '<p class="muted small dash-side-note">프로젝트 직접비 ' +
-      esc(formatDashMoney(k.projectDirect)) + " · 에이전시 수수료 " +
-      esc(formatDashMoney(k.agencyFees)) + " · 판관비 " +
-      esc(formatDashMoney(sga)) + "</p>";
+    var cmp = App.Engine.runScenarioComparison(state, result);
+    var soloEV = App.Money.roundWon(cmp.scenarios.soloAgency.controlledEconomicValue);
+    var exEV = App.Money.roundWon(cmp.scenarios.exclusiveContract.controlledEconomicValue);
+    var evDelta = App.Money.roundWon(cmp.deltas.controlledEconomicValue);
+    html += '<div class="card"><h2>1인 기획사 vs 기존 회사 전속</h2>';
+    html += '<p class="muted small">같은 매출 기준, 지금 시점 경제가치 비교입니다. 상세 산식은 분석 &gt; 시나리오 비교에서 확인합니다.</p>';
+    html += '<div class="dash-metrics">';
+    html += dashMetric("1인 기획사 경제가치", soloEV, "hero" + (evDelta >= 0 ? " good" : ""));
+    html += dashMetric("기존 회사 전속 경제가치", exEV);
+    html += dashMetric("차이(1인 − 전속)", evDelta, evDelta >= 0 ? "good" : "bad");
     html += "</div></div></div>";
     return html;
-  }
-
-  function cashChart(result) {
-    var rows = result.months || [];
-    if (!rows.length) return "";
-    var w = 640, h = 160, pad = 18;
-    var vals = rows.map(function (r) { return r.closing; });
-    var min = Math.min.apply(null, vals.concat([0]));
-    var max = Math.max.apply(null, vals.concat([0]));
-    if (min === max) { max = min + 1; }
-    function x(i) { return pad + (w - pad * 2) * (rows.length === 1 ? 0 : i / (rows.length - 1)); }
-    function y(v) { return h - pad - (h - pad * 2) * ((v - min) / (max - min)); }
-    var d = rows.map(function (r, i) { return (i ? "L" : "M") + x(i) + " " + y(r.closing); }).join(" ");
-    var zero = y(0);
-    var safety = y(result.kpis.safetyCash);
-    var svg = '<svg class="chart" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none">';
-    svg += '<line x1="' + pad + '" y1="' + zero + '" x2="' + (w - pad) + '" y2="' + zero + '" stroke="#e2e6ed" />';
-    if (result.kpis.safetyCash) {
-      svg += '<line x1="' + pad + '" y1="' + safety + '" x2="' + (w - pad) + '" y2="' + safety + '" stroke="#b42318" stroke-dasharray="4 3" />';
-    }
-    svg += '<path d="' + d + '" fill="none" stroke="#1a2744" stroke-width="2" />';
-    rows.forEach(function (r, i) {
-      svg += '<circle cx="' + x(i) + '" cy="' + y(r.closing) + '" r="3" fill="' + (r.closing < 0 ? "#b42318" : "#1a2744") + '" />';
-    });
-    svg += "</svg>";
-    return '<div class="muted small">월말 현금 · 점선은 안전잔액 · 0 이하는 경고색</div>' + svg;
   }
 
   function simStatusText(state, months) {
@@ -1466,7 +1344,7 @@
   function simTabId(ui) {
     var tab = (ui && ui.simTab) || "basics";
     if (tab === "opex") return "basics";
-    if (tab === "org" || tab === "support" || tab === "fees" || tab === "tax") return tab;
+    if (tab === "org" || tab === "support" || tab === "fees" || tab === "tax" || tab === "settings") return tab;
     return "basics";
   }
 
@@ -1477,7 +1355,8 @@
       { id: "org", label: "조직·인건비" },
       { id: "support", label: "회사 지원" },
       { id: "fees", label: "수수료·정책" },
-      { id: "tax", label: "세금·비교조건" }
+      { id: "tax", label: "세금·비교조건" },
+      { id: "settings", label: "설정" }
     ].forEach(function (t) {
       html += '<button type="button" class="' + (tab === t.id ? "active" : "") +
         '" data-action="sim-tab" data-tab="' + t.id + '">' + esc(t.label) + "</button>";
@@ -1589,7 +1468,8 @@
     if (tab === "org") html += renderSimOrg(state, result, ui);
     else if (tab === "support") html += renderSupportPolicies(state, ui);
     else if (tab === "fees") html += renderRevenueFees(state, result);
-    else if (tab === "tax") html += renderScenarioSettings(state, result);
+    else if (tab === "tax") html += renderScenarioSettings(state, result, ui);
+    else if (tab === "settings") html += renderSettings(state);
     else html += renderSimBasics(state, result);
     html += '<p class="muted small sim-status" data-computed="sim-status">' + simStatusText(state, months) + "</p>";
     html += "</div>";
@@ -2013,7 +1893,8 @@
         amount: App.Format.formatWon(v.deposit),
         unit: "1회",
         period: (App.Format.formatMonthIso(v.startMonth) || "미정") + (endLabel !== "미정" ? " ~ " + endLabel : ""),
-        status: "차량 연동"
+        status: "차량 연동",
+        chevron: false
       });
       html += "</div></div>";
     });
@@ -2067,6 +1948,29 @@
     return String(Math.round(App.Money.toSafeNumber(ratio) * 1000) / 10);
   }
 
+  function narrowTaxLabel(label) {
+    return String(label || "").replace(/\s*\([^)]*\)\s*$/, "");
+  }
+
+  function ownerPayoutShortLabel(solo, detail) {
+    if (detail && detail.payoutIncomeLabel) return detail.payoutIncomeLabel;
+    if (solo && solo.ownerDividendMode === "rate") return "대표 배당";
+    return "대표 배당";
+  }
+
+  function ownerPayoutAmountLabel(solo) {
+    if (solo && solo.ownerDividendMode === "rate") {
+      return "대표 배당 (영업이익 × " + pctView(solo.ownerDividendRate) + "%)";
+    }
+    return "대표 배당";
+  }
+
+  function ownerPayoutTaxLabel(solo, detail) {
+    if (detail && detail.payoutTaxLabel) return detail.payoutTaxLabel;
+    if (solo && solo.ownerPayoutTaxLabel) return solo.ownerPayoutTaxLabel;
+    return "배당소득세 (15.4%)";
+  }
+
   function burdenOptions() {
     return [
       { id: "company", label: "회사 부담" },
@@ -2076,13 +1980,29 @@
     ];
   }
 
-  function renderPersonalTaxFields(prefix, tax, common) {
+  function simAttributionYearText(result) {
+    var months = (result && result.months) || [];
+    var years = App.TaxYear && App.TaxYear.yearsFromMonths ? App.TaxYear.yearsFromMonths(months) : [];
+    if (!years.length) return "시뮬 기간 자동";
+    if (years.length === 1) return String(years[0]) + " (자동)";
+    return years[0] + "–" + years[years.length - 1] + " (자동)";
+  }
+
+  function renderPersonalTaxFields(prefix, tax, common, opts) {
     tax = tax || App.Defaults.defaultPersonalTaxSettings();
     common = common || {};
+    opts = opts || {};
     var mode = common.mode === "rate" || common.mode === "auto" || common.mode === "manual"
       ? common.mode
       : (tax.mode === "rate" || tax.mode === "auto" || tax.mode === "manual" ? tax.mode : "auto");
     var year = common.year || tax.year || 2026;
+    if (opts.autoOnly) {
+      return '<div class="row-fields">' +
+        '<div class="field"><label>개인세금</label><div class="readonly-val">누진세율 자동</div></div>' +
+        '<div class="field"><label>귀속연도</label><div class="readonly-val">' +
+        esc(opts.yearText || "시뮬 기간 자동") + "</div></div></div>" +
+        '<p class="muted small">근로소득은 누진세율로 계산하고, 배당은 배당소득세 15.4%, 수익배분은 사업소득세·주민세 3.3%를 더합니다. 귀속연도는 시뮬레이션 기간에서 자동입니다.</p>';
+    }
     var html = '<div class="row-fields">';
     html += '<div class="field"><label>개인세금 방식</label>' +
       selectInput("settings.personalTaxCommon.mode", mode, [
@@ -2101,7 +2021,7 @@
         selectInput("settings.personalTaxCommon.year", String(year), taxYearOptions()) + "</div>";
     }
     html += "</div>";
-    html += '<p class="muted small">자동 계산 시 1인 기획사는 대표 급여 직원의 실제 급여 원장을 연도별로 읽어 근로소득세·지방소득세를 계산합니다. 수동 세액을 고르면 입력값이 우선합니다.</p>';
+    html += '<p class="muted small">자동 계산 시 1인 기획사는 대표 급여의 근로소득세에, 배당이면 배당소득세 15.4%, 수익배분이면 사업소득세 3.3%를 더합니다. 수동 세액을 고르면 입력값이 우선합니다.</p>';
     return html;
   }
 
@@ -2128,7 +2048,7 @@
     return html;
   }
 
-  function renderScenarioSettings(state, result) {
+  function renderScenarioSettings(state, result, ui) {
     App.Defaults.ensureScenarioSettings(state);
     var ids = state.settings.scenarioComparison.enabledScenarioIds || [];
     var solo = state.settings.scenarios.soloAgency;
@@ -2140,6 +2060,7 @@
     var employees = [{ id: "", label: "자동 (대표 역할 직원)" }].concat((state.employees || []).map(function (emp) {
       return { id: emp.id, label: ((emp.name || "직원") + (emp.role ? " · " + emp.role : "")) };
     }));
+    var soloEdit = !!(ui && ui.soloTaxFormEdit);
     var html = '<div class="card sim-compact scenario-settings"><h2>비교 시나리오</h2>';
     html += '<p class="muted small">같은 수익 데이터를 기준으로 비교할 시나리오를 고릅니다. 결과는 분석 &gt; 시나리오 비교에 표시됩니다.</p>';
     html += '<div class="scenario-enable">';
@@ -2156,18 +2077,105 @@
     html += '<details class="card scenario-acc"' + (ids.indexOf("soloAgency") >= 0 ? " open" : "") + ">";
     html += "<summary>1인 기획사</summary>";
     html += '<div class="scenario-acc-body">';
-    html += '<p class="muted small">법인 운영 결과는 현재 시뮬레이션을 그대로 씁니다. 여기서는 배우 개인 귀속만 지정합니다.</p>';
+    html += '<div class="scenario-edit-bar">';
+    html += '<p class="muted small">법인 운영 결과는 현재 시뮬레이션을 그대로 씁니다. 급여·인센티브는 조직·인건비, 배당·수익배분은 여기서 지정합니다.</p>';
+    html += '<button type="button" class="btn' + (soloEdit ? " primary" : "") +
+      '" data-action="toggle-solo-tax-edit">' + (soloEdit ? "완료" : "수정") + "</button>";
+    html += "</div>";
+    html += '<fieldset class="solo-tax-form"' + (soloEdit ? "" : " disabled") + ">";
     html += '<div class="field"><label>대표자 급여 직원</label>' +
       selectInput("settings.scenarios.soloAgency.ownerPayout.salaryEmployeeId", solo.ownerPayout.salaryEmployeeId || "", employees) + "</div>";
+    var divOn = App.Defaults.isDividendOn
+      ? App.Defaults.isDividendOn(solo.ownerPayout)
+      : solo.ownerPayout.dividendOn !== false;
+    var divMode = solo.ownerPayout.dividendMode === "rate" ? "rate" : "amount";
+    var resolvedDiv = App.Defaults.resolveOwnerDividend
+      ? App.Defaults.resolveOwnerDividend(state, (result && result.months) || [], {
+          afterTaxNet: result && result.kpis && result.kpis.taxDetail
+            ? App.Money.roundWon(result.kpis.taxDetail.afterTaxNet)
+            : 0,
+          operatingProfit: result && result.kpis ? result.kpis.operatingProfit : 0,
+          byYear: result && result.kpis && result.kpis.taxDetail && result.kpis.taxDetail.byYear
+        })
+      : { amount: App.Money.roundWon(solo.ownerPayout.dividendAmount), years: [] };
+    var divTax = App.Defaults.ownerDividendWithholding(1);
+    html += "<h3>배당</h3>";
+    html += '<div class="plan-filter dividend-on-toggle">';
+    html += '<label class="check"><input type="radio" name="solo-div-on" data-action="set-dividend-on" data-on="1"' +
+      (divOn ? " checked" : "") + "> 배당 있음</label>";
+    html += '<label class="check"><input type="radio" name="solo-div-on" data-action="set-dividend-on" data-on="0"' +
+      (divOn ? "" : " checked") + "> 배당 없음</label>";
+    html += "</div>";
+    if (divOn) {
+      html += '<div class="div-year-wrap"><table class="div-year-table"><thead><tr>';
+      html += "<th>연도</th><th class=\"num\">영업이익연동</th><th class=\"num\">배당비율</th>";
+      html += "<th class=\"num\">배당액</th><th class=\"num\">납부할 세율</th><th>배당지급일</th>";
+      html += "</tr></thead><tbody>";
+      var divYears = resolvedDiv.years || [];
+      if (!divYears.length) {
+        html += '<tr><td colspan="6" class="muted">시뮬레이션 기간의 연도가 여기 자동으로 채워집니다.</td></tr>';
+      }
+      divYears.forEach(function (row, idx) {
+        html += "<tr>";
+        html += "<td>" + esc(String(row.year)) + "</td>";
+        html += '<td class="num">' + App.Format.formatWon(row.operatingProfit) + "</td>";
+        html += "<td class=\"num\">";
+        if (idx === 0) {
+          html += percentInput("settings.scenarios.soloAgency.ownerPayout.dividendRate", pctView(solo.ownerPayout.dividendRate), 'data-kind="percent"');
+        } else {
+          html += '<span class="muted">' + esc(pctView(row.rate)) + "%</span>";
+        }
+        html += "</td>";
+        html += '<td class="num">' + App.Format.formatWon(row.amount) +
+          (divMode === "rate" ? '<div class="auto">자동</div>' : "") + "</td>";
+        html += '<td class="num">' + esc(pctView(divTax.rate)) + "%</td>";
+        html += "<td>" + (row.month ? esc(App.Month.monthLabel(row.month)) : "—") + "</td>";
+        html += "</tr>";
+      });
+      html += "</tbody></table></div>";
+      if (divMode !== "rate") {
+        html += '<div class="row-fields">';
+        html += '<div class="field"><label>지정 배당액</label>' +
+          moneyInput("settings.scenarios.soloAgency.ownerPayout.dividendAmount", App.Money.roundWon(solo.ownerPayout.dividendAmount)) + "</div>";
+        html += "</div>";
+      }
+      html += '<p class="muted small">연도는 시뮬레이션 기간에서 자동입니다. 그 해 영업이익이 플러스일 때만 비율을 곱하고, 다음 해 3월에 지급합니다. 시뮬이 그 전에 끝나면 마지막 달에 지급합니다. 적자면 0원입니다. 배당소득세·주민세 원천징수 15.4%입니다. 손익비용이 아니라 이익잉여금 인출입니다.</p>';
+    }
+    var resolvedShare = App.Defaults.resolveOwnerProfitShare
+      ? App.Defaults.resolveOwnerProfitShare(state, (result && result.months) || [])
+      : { workRevenue: 0, salesRevenue: 0, workAmount: 0, salesAmount: 0, tax: { rate: 0.033 } };
+    var shareTax = App.Defaults.ownerProfitShareWithholding
+      ? App.Defaults.ownerProfitShareWithholding(1)
+      : { rate: 0.033 };
+    html += "<h3>수익배분</h3>";
+    html += '<p class="muted small">작품·영업 매출에 배분율을 곱합니다. 사업소득세·주민세 3.3%입니다. 배당과 별도이며, 손익비용이 아니라 이익잉여금 인출입니다.</p>';
+    html += '<div class="div-year-wrap"><table class="div-year-table"><thead><tr>';
+    html += "<th>구분</th><th class=\"num\">기간 매출</th><th class=\"num\">수익배분율</th>";
+    html += "<th class=\"num\">배분액</th><th class=\"num\">납부할 세율</th>";
+    html += "</tr></thead><tbody>";
+    html += "<tr><td>작품</td>";
+    html += '<td class="num">' + App.Format.formatWon(resolvedShare.workRevenue) + "</td>";
+    html += '<td class="num">' + percentInput("settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate", pctView(solo.ownerPayout.profitShareWorkRate), 'data-kind="percent"') + "</td>";
+    html += '<td class="num">' + App.Format.formatWon(resolvedShare.workAmount) + '<div class="auto">자동</div></td>';
+    html += '<td class="num">' + esc(pctView(shareTax.rate)) + "%</td></tr>";
+    html += "<tr><td>영업</td>";
+    html += '<td class="num">' + App.Format.formatWon(resolvedShare.salesRevenue) + "</td>";
+    html += '<td class="num">' + percentInput("settings.scenarios.soloAgency.ownerPayout.profitShareSalesRate", pctView(solo.ownerPayout.profitShareSalesRate), 'data-kind="percent"') + "</td>";
+    html += '<td class="num">' + App.Format.formatWon(resolvedShare.salesAmount) + '<div class="auto">자동</div></td>';
+    html += '<td class="num">' + esc(pctView(shareTax.rate)) + "%</td></tr>";
+    html += "</tbody></table></div>";
     html += '<div class="field" style="max-width:220px"><label>법인 잔여현금 청산(인출) 세율</label>' +
       percentInput("settings.tax.liquidationTaxRate", pctView(state.settings.tax.liquidationTaxRate), 'data-kind="percent"') + "</div>";
     html += '<p class="muted small">법인에 남는 현금을 나중에 배당·급여 등으로 개인화할 때 드는 세금의 단순 가정 세율입니다(기본 15.4% = 배당소득세 원천징수율). 실제 청산소득 법인세 등 별도 규정은 반영하지 않습니다.</p>';
+    html += "<h3>개인세금</h3>";
     html += renderPersonalTaxFields(
       "settings.scenarios.soloAgency.personalTax",
       solo.personalTax,
-      state.settings.personalTaxCommon
+      state.settings.personalTaxCommon,
+      { autoOnly: true, yearText: simAttributionYearText(result) }
     );
     html += renderPersonalTaxSummary(cmp.scenarios.soloAgency);
+    html += "</fieldset>";
     html += "</div></details>";
 
     html += '<details class="card scenario-acc"' + (ids.indexOf("exclusiveContract") >= 0 ? " open" : "") + ">";
@@ -2536,10 +2544,13 @@
     var html = '<details class="work-item' + (off ? " off" : "") + (isDraft ? " is-draft" : "") +
       '" data-work-item="' + esc(project.id) + '"' + (open ? " open" : "") + ">";
     html += '<summary><div class="work-grid work-row">';
+    html += '<span class="work-kind">' + familyBadge(isSalesCat(project.category) ? "영업" : "작품") + "</span>";
     html += '<span class="work-cat">' + catBadge(catId, categoryLabel(catId), { active: ui && ui.planCategory === catId }) + "</span>";
-    html += '<span class="work-name"><span class="work-title">' + esc(project.name || "이름 없는 건") + "</span>";
+    html += '<span class="work-name"><span class="work-title-row"><i class="chev" aria-hidden="true"></i>' +
+      '<span class="work-title">' + esc(project.name || "이름 없는 건") + "</span>";
     if (scale) html += '<span class="work-name-meta">' + esc(scale) + "</span>";
     else if (pay.text && !pay.tone) html += '<span class="work-name-meta">' + esc(pay.text) + "</span>";
+    html += "</span>";
     if (pay.tone) {
       html += '<span class="work-pay-flag recon-' + pay.tone + '"' +
         (pay.title ? ' title="' + esc(pay.title) + '"' : "") + ">" + esc(pay.text) + "</span>";
@@ -2591,7 +2602,6 @@
     var sum = 0;
     var n = 0;
     var html = '<div class="rev-group">';
-    html += '<div class="rev-group-label">' + esc(label) + "</div>";
     rows.forEach(function (row) {
       if (!row.draft && row.project.status !== "cancelled") {
         n += 1;
@@ -2600,8 +2610,15 @@
       html += renderWorkRow(row.project, row.idx, state, result, ui, { draft: !!row.draft });
     });
     if (n) {
-      html += '<div class="rev-sub is-hero">' + esc(label) + " 소계 · " + n + "건 · " +
-        App.Format.formatWon(sum) + "</div>";
+      html += '<div class="work-grid rev-sub">';
+      html += '<span class="work-kind">' + familyBadge(label) + "</span>";
+      html += "<span></span>";
+      html += "<span>" + esc(label) + " 소계</span>";
+      html += '<span class="work-amt">' + App.Format.formatWon(sum) + "</span>";
+      html += "<span></span><span></span>";
+      html += "<span>" + n + "건</span>";
+      html += "<span></span>";
+      html += "</div>";
     }
     html += "</div>";
     return html;
@@ -2611,8 +2628,8 @@
     var rows = listedProjects(state, ui);
     var html = '<div class="rev-ledger">';
     html += '<div class="work-grid work-cols" aria-hidden="true">';
-    html += "<span>구분</span><span>건명</span><span class=\"num\">금액</span>" +
-      "<span class=\"num\">부가세</span><span class=\"num\">진행비</span><span>기간</span><span>상태</span></div>";
+    html += "<span>상위구분</span><span>구분</span><span>건명</span><span class=\"num num-center\">금액</span>" +
+      "<span class=\"num num-center\">부가세</span><span class=\"num\">진행비</span><span>기간</span><span>상태</span></div>";
     if (!rows.length) {
       html += '<div class="plan-empty-line"><span>등록된 수익 건이 없습니다.</span></div>';
       html += "</div>";
@@ -2655,6 +2672,13 @@
     return html;
   }
 
+  function revenueRateSummaryText(state) {
+    App.Defaults.ensureRevenueExpenseRates(state);
+    var rates = state.settings.revenueExpenseRates;
+    return "작품 " + pctView(rates.work) + "% · 영업 " + pctView(rates.sales) +
+      "% · 시딩 " + rates.appearanceLight + "배 · 광고 " + rates.appearanceHeavy + "배";
+  }
+
   function renderRevenueRateBar(state) {
     App.Defaults.ensureRevenueExpenseRates(state);
     var rates = state.settings.revenueExpenseRates;
@@ -2665,6 +2689,7 @@
       percentInput("settings.revenueExpenseRates.work", pctView(rates.work), 'data-kind="fee-rate"') + "</div>";
     html += '<div class="rev-rate-row"><span>영업</span>' +
       percentInput("settings.revenueExpenseRates.sales", pctView(rates.sales), 'data-kind="fee-rate"') + "</div>";
+    html += '<p class="muted small">드라마·영화·OTT 등 작품과, 헤메·식대 자동이 아닌 영업 건에 씁니다. 기본값 사용이 켜진 건은 계약금액 × 이 비율입니다.</p>';
     html += "</div>";
     html += '<div class="rev-rate-group rev-rate-group-mult">';
     html += "<h3>헤메·식대 배율</h3>";
@@ -2674,38 +2699,20 @@
     html += '<div class="rev-rate-row"><span>광고·화보</span>' +
       withUnit(textInput("settings.revenueExpenseRates.appearanceHeavy", rates.appearanceHeavy, 'data-kind="number" inputmode="decimal"'), "배") +
       "</div>";
+    html += '<p class="muted small">계약금 % 대신 헤어·메이크업·스타일링 1회 단가와 당일 식대에 횟수와 배율을 곱합니다.</p>';
     html += "</div></div>";
     return html;
   }
 
   function renderRevenueRateHelpModal(state) {
-    App.Defaults.ensureRevenueExpenseRates(state);
-    var rates = state.settings.revenueExpenseRates;
-    var workPct = pctView(rates.work);
-    var salesPct = pctView(rates.sales);
-    var light = rates.appearanceLight;
-    var heavy = rates.appearanceHeavy;
     var html = '<div class="app-modal-backdrop" role="presentation">';
-    html += '<div class="app-modal" role="dialog" aria-modal="true" aria-labelledby="rev-rate-help-title">';
+    html += '<div class="app-modal app-modal-rates" role="dialog" aria-modal="true" aria-labelledby="rev-rate-help-title">';
     html += '<div class="app-modal-head">';
-    html += '<h3 id="rev-rate-help-title">계산 기준 안내</h3>';
+    html += '<h3 id="rev-rate-help-title">진행비·배율</h3>';
     html += '<button type="button" class="app-modal-x" data-action="close-revenue-rate-help" aria-label="닫기">×</button>';
     html += "</div>";
     html += '<div class="app-modal-body">';
-    html += '<section class="app-modal-section"><h4>진행비 기본률</h4>';
-    html += '<div class="app-modal-row"><span>작품</span><span>드라마·영화·OTT 등 작품 수익에 적용하는 기본 진행비율입니다. 현재 값: <b>' +
-      esc(workPct) + "%</b></span></div>";
-    html += '<div class="app-modal-row"><span>영업</span><span>매거진·기타 영업 등 헤메·식대 자동이 아닌 영업 수익에 적용하는 기본 진행비율입니다. 현재 값: <b>' +
-      esc(salesPct) + "%</b></span></div>";
-    html += '<p class="app-modal-note">기본값 사용이 켜진 건은 계약금액 × 이 비율로 진행비를 계산합니다.</p>';
-    html += "</section>";
-    html += '<section class="app-modal-section"><h4>헤메·식대 배율</h4>';
-    html += '<p class="app-modal-note">시딩·행사·앰버서더·광고·화보는 계약금 % 대신, 헤어·메이크업·스타일링 1회 단가와 당일 식대를 더한 금액에 횟수와 배율을 곱합니다.</p>';
-    html += '<div class="app-modal-row"><span>시딩·행사·앰버서더</span><span>기본 헤메·식대 금액의 <b>' +
-      esc(String(light)) + "배</b>를 적용합니다.</span></div>";
-    html += '<div class="app-modal-row"><span>광고·화보</span><span>기본 헤메·식대 금액의 <b>' +
-      esc(String(heavy)) + "배</b>를 적용합니다.</span></div>";
-    html += "</section>";
+    html += renderRevenueRateBar(state);
     html += '<section class="app-modal-section"><h4>개별 수익의 우선순위</h4>';
     html += '<p class="app-modal-note">개별 수익에서 진행비 반영을 끄면 진행비는 0입니다. 수동 금액 사용을 켜면 입력한 총액이 사용됩니다. 헤메·식대 자동 또는 기본값 사용을 끄면 계약금액 × 해당 건의 진행비율로 계산합니다.</p>';
     html += "</section>";
@@ -2721,9 +2728,12 @@
     var html = '<div class="card rates-card setup-block">';
     html += '<div class="rev-plan-head">';
     html += "<h2>매출 계획</h2>";
-    html += '<button type="button" class="btn btn-sm rev-help-btn" data-action="open-revenue-rate-help">? 계산 기준 안내</button>';
+    html += '<button type="button" class="btn btn-sm rev-rate-btn" data-action="open-revenue-rate-help">';
+    html += "<span>진행비·배율</span>";
+    html += '<span class="rev-rate-btn-vals" data-computed="rev-rate-summary">' +
+      esc(revenueRateSummaryText(state)) + "</span>";
+    html += "</button>";
     html += "</div>";
-    html += renderRevenueRateBar(state);
     html += '<div class="rev-toolbar">';
     html += planFilterBar(ui);
     html += '<label class="rev-add-cat"><span>카테고리</span>' +
@@ -2948,6 +2958,9 @@
 
   function patchSales(root, state) {
     if (!root || !root.querySelector(".view-revenue, .rates-card")) return;
+    root.querySelectorAll('[data-computed="rev-rate-summary"]').forEach(function (el) {
+      el.textContent = revenueRateSummaryText(state);
+    });
     var progress = App.Defaults.salesPlanProgress(state);
     (progress.groups || []).forEach(function (g) {
       root.querySelectorAll('[data-computed="rate-meta"][data-group="' + g.id + '"]').forEach(function (el) {
@@ -3138,7 +3151,7 @@
       if (salesRows.length) {
         html += '<div class="reg-group">';
         salesRows.forEach(function (row) { html += renderRegisteredSideRow(row, gap); });
-        html += '<div class="reg-subtotal"><span>영업 소계</span><b data-computed="reg-plans">' +
+        html += '<div class="reg-subtotal is-hero"><span>영업 소계</span><b data-computed="reg-plans">' +
           App.Format.formatWon(plans) + "</b></div>";
         html += "</div>";
       }
@@ -3563,24 +3576,26 @@
       { id: "startup", label: "초기비용" },
       { id: "rent2f", label: "임대료(2층)" },
       { id: "funding", label: "자산·보증금" },
-      { id: "opex", label: "운영비" }
+      { id: "opex", label: "운영비" },
+      { id: "project", label: "프로젝트 진행비" }
     ].forEach(function (t) {
       html += '<button type="button" class="' + (tab === t.id ? "active" : "") +
         '" data-action="cost-tab" data-tab="' + t.id + '">' + esc(t.label) + "</button>";
     });
     html += "</div>";
-    html += '<div class="cost-toolbar">';
-    html += '<button type="button" class="btn" data-action="expand-cost-all">전체 펼치기</button>';
-    html += '<button type="button" class="btn" data-action="collapse-cost-all">전체 접기</button>';
-    html += "</div>";
+    if (tab !== "rent2f") {
+      html += '<div class="cost-toolbar">';
+      html += '<button type="button" class="btn" data-action="expand-cost-all">전체 펼치기</button>';
+      html += '<button type="button" class="btn" data-action="collapse-cost-all">전체 접기</button>';
+      html += "</div>";
+    }
     html += '<div class="cost-sheet">';
 
     if (tab === "startup") {
-      html += '<p class="muted small cost-intro">일반 설립비용은 통상적인 법인 설립 소요비용 기준이고, 실제 예상안은 이번 시뮬레이션에 반영할 금액입니다. 반영월은 Cash Flow에 비용을 넣을 월이며 기본값은 시뮬레이션 시작월입니다.</p>';
       html += renderCostSection({
         id: "startup",
         title: "설립 시 1회 비용",
-        summary: lineSecText(state.startupExpenses),
+        summary: costGrandTotalText(state.startupExpenses, corporateStatus),
         addAction: "add-line",
         addAttrs: ' data-list="startupExpenses"',
         extraClass: "cost-sec-flat",
@@ -3593,7 +3608,7 @@
           "</div>"
       });
     } else if (tab === "rent2f") {
-      html += renderRent2fTab(state);
+      html += renderRent2fTab(state, ui);
     } else if (tab === "funding") {
       html += '<p class="muted small cost-intro">현금은 지출되지만 보증금 또는 자산으로 남는 항목입니다. 보증금은 손익 비용으로 처리하지 않습니다. 차량 보증금은 시뮬레이션 설정 &gt; 회사 지원에서 수정합니다.</p>';
       html += '<details class="compat-hidden" data-cost-sec="deposits" open></details>';
@@ -3619,33 +3634,114 @@
       html += '<div class="cost-foot-row cost-row-list"><span></span><span></span><span>현금투입 합계</span><span class="cost-amt"><b data-computed="cost-fund-total">' +
         App.Format.formatWon(fund.sum + cap.sum) + '</b></span><span class="cost-unit">-</span><span></span><span></span></div>';
       html += "</div>";
+    } else if (tab === "project") {
+      html += '<p class="muted small cost-intro">각 프로젝트의 진행비·밥차비와 에이전시 수수료를 모은 읽기 전용 요약입니다. 원본은 수익 탭의 각 프로젝트, 매출연동 수수료는 시뮬레이션 설정 &gt; 수수료·정책에서 설정합니다.</p>';
+      var pgLedger = result && result.ledger;
+      var pgProjectGroup = ledgerGroupById(pgLedger, "project");
+      var pgAgencyGroup = ledgerGroupById(pgLedger, "agency");
+      function pgRows(group, account) {
+        if (!(group && group.rows && group.rows.length)) {
+          return '<div class="cost-empty muted small">등록된 항목 없음</div>';
+        }
+        return group.rows.map(function (row) {
+          return '<div class="cost-item"><div class="cost-row cost-row-list">' +
+            costSummaryCells({
+              family: "매출원가",
+              account: account,
+              name: row.label,
+              amount: App.Format.formatWon(App.Money.roundWon(-row.total)),
+              unit: "전체기간",
+              period: "자동계산",
+              status: "포함",
+              chevron: false
+            }) + "</div></div>";
+        }).join("");
+      }
+      var pgProjectTotal = pgProjectGroup ? App.Money.roundWon(-pgProjectGroup.subtotal.total) : 0;
+      var pgAgencyTotal = pgAgencyGroup ? App.Money.roundWon(-pgAgencyGroup.subtotal.total) : 0;
+      html += '<div class="cost-list">';
+      html += costListCols();
+      html += renderCostSection({
+        id: "project-direct",
+        title: "프로젝트 직접비 (진행비·밥차비)",
+        amount: App.Format.formatWon(pgProjectTotal),
+        unit: "전체기간",
+        period: (pgProjectGroup ? pgProjectGroup.rows.length : 0) + "건",
+        extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
+        open: isSecOpen(ui, "project-direct"),
+        body: pgRows(pgProjectGroup, "진행비")
+      });
+      html += renderCostSection({
+        id: "project-agency",
+        title: "에이전시 수수료",
+        amount: App.Format.formatWon(pgAgencyTotal),
+        unit: "전체기간",
+        period: (pgAgencyGroup ? pgAgencyGroup.rows.length : 0) + "건",
+        extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
+        open: isSecOpen(ui, "project-agency"),
+        body: pgRows(pgAgencyGroup, "에이전시 수수료")
+      });
+      html += '<div class="cost-foot-row cost-row-list"><span></span><span></span><span>매출원가 합계</span><span class="cost-amt"><b>' +
+        App.Format.formatWon(pgProjectTotal + pgAgencyTotal) + '</b></span><span class="cost-unit">전체기간</span><span></span><span></span></div>';
+      html += "</div>";
     } else {
-      html += '<p class="muted small cost-intro">회사 운영 중 반복적으로 발생하며 손익에 반영되는 판매비와관리비입니다. [연동] 배지 항목은 다른 설정 화면에서 자동으로 가져오며, 여기서는 수정하지 않습니다.</p>';
       html += '<details class="compat-hidden" data-cost-sec="recurring" open></details>';
       var sgaBody = '<div class="cost-list">';
       sgaBody += costListCols();
       sgaBody += renderCostSection({
         id: "payroll",
         title: "인건비",
-        summary: "인건비 합계 " + App.Format.formatWon(salarySum(state.employees)) + " · 조직 설정 연동",
+        amount: App.Format.formatWon(salarySum(state.employees)),
+        unit: "월",
+        period: "조직 설정 연동",
         extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
         open: isSecOpen(ui, "payroll"),
         body: renderEmployeeAccordions(state, ui, true, { noWrap: true })
       });
+      var insGroup = ledgerGroupById(result && result.ledger, "insurance");
+      var insTotal = insGroup ? App.Money.roundWon(-insGroup.subtotal.total) : 0;
+      sgaBody += renderCostSection({
+        id: "insurance",
+        title: "4대보험 (회사 부담)",
+        amount: App.Format.formatWon(insTotal),
+        unit: "전체기간",
+        period: "급여 연동 자동계산",
+        extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
+        open: isSecOpen(ui, "insurance"),
+        body: ((insGroup && insGroup.rows.length) ? insGroup.rows.map(function (row) {
+            return '<div class="cost-item"><div class="cost-row cost-row-list">' +
+              costSummaryCells({
+                family: "판관비",
+                account: "4대보험",
+                name: row.label,
+                amount: App.Format.formatWon(App.Money.roundWon(-row.total)),
+                unit: "전체기간",
+                period: "자동계산",
+                status: "포함",
+                chevron: false
+              }) + "</div></div>";
+          }).join("") : '<div class="cost-empty muted small">대상 직원 없음</div>')
+      });
+      var rentParts = recGroupSummaryParts(state.recurringExpenses, "rent", state);
       sgaBody += renderCostSection({
         id: "recurring-rent",
         title: "임대료",
-        summary: recGroupSummaryText(state.recurringExpenses, "rent", state),
+        amount: rentParts.amount,
+        unit: rentParts.unit,
+        period: rentParts.period,
         addAction: "add-recurring",
         addAttrs: ' data-category="rent"',
         extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
         open: isSecOpen(ui, "recurring-rent"),
         body: renderRecurringAccordions(state, ui, "rent", { noWrap: true })
       });
+      var mktParts = recGroupSummaryParts(state.recurringExpenses, "marketing", state);
       sgaBody += renderCostSection({
         id: "recurring-marketing",
         title: "마케팅비",
-        summary: recGroupSummaryText(state.recurringExpenses, "marketing", state),
+        amount: mktParts.amount,
+        unit: mktParts.unit,
+        period: mktParts.period,
         addAction: "add-recurring",
         addAttrs: ' data-category="marketing"',
         extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
@@ -3677,27 +3773,59 @@
       sgaBody += renderCostSection({
         id: "support-vehicle",
         title: "차량비",
-        summary: vehicleStats.n + "건 · 월 " + App.Format.formatWon(vehicleStats.sum),
+        amount: App.Format.formatWon(vehicleStats.sum),
+        unit: "월",
+        period: vehicleStats.n + "건",
         extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
         open: isSecOpen(ui, "support-vehicle"),
-        body: '<p class="muted small">원본은 시뮬레이션 설정 &gt; 회사 지원 &gt; 차량입니다. 수정은 원본에서 합니다.</p>' +
-          renderAutoSupportList(vehicleList, state, "차량비", { noWrap: true })
+        body: renderAutoSupportList(vehicleList, state, "차량비", { noWrap: true })
       });
       var actorEditableHtml = renderCostTabEditableSupportRows(actorEditableEntries, state, ui, "배우 활동지원");
       sgaBody += renderCostSection({
         id: "support-actor",
         title: "배우 활동지원",
-        summary: actorStats.n + "건 · 월 " + App.Format.formatWon(actorStats.sum),
+        amount: App.Format.formatWon(actorStats.sum),
+        unit: "월",
+        period: actorStats.n + "건",
         extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
         open: isSecOpen(ui, "support-actor"),
-        body: '<p class="muted small">원본은 시뮬레이션 설정 &gt; 회사 지원입니다. 수정은 원본에서 합니다. 다만 소품비·스타일링비와 직접 추가한 항목은 1인 기획사가 직접 부담하는 비용이라 여기서 바로 금액을 수정할 수 있습니다.</p>' +
-          renderAutoSupportList(actorReadonlyList, state, "배우 활동지원", { noWrap: true }) + actorEditableHtml
+        body: renderAutoSupportList(actorReadonlyList, state, "배우 활동지원", { noWrap: true }) + actorEditableHtml
       });
 
+      var sgaFees = (state.revenueFees || []).filter(function (f) { return (f.category || "sga") === "sga"; });
+      var feeTotals = (result && result.revenueFees && result.revenueFees.totalsByFee) || {};
+      var sgaFeeSum = App.Money.sumBy(sgaFees.filter(function (f) { return f.include !== false; }),
+        function (f) { return feeTotals[f.id]; });
+      sgaBody += renderCostSection({
+        id: "revenue-fees",
+        title: "매출연동 수수료",
+        amount: App.Format.formatWon(sgaFeeSum),
+        unit: "전체기간",
+        period: sgaFees.length + "건",
+        extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
+        open: isSecOpen(ui, "revenue-fees"),
+        body: (sgaFees.length ? sgaFees.map(function (f) {
+            var included = f.include !== false;
+            return '<div class="cost-item' + (included ? "" : " off") + '"><div class="cost-row cost-row-list">' +
+              costSummaryCells({
+                family: "판관비",
+                account: "매출연동 수수료",
+                name: f.name || "수수료",
+                amount: App.Format.formatWon(included ? App.Money.roundWon(feeTotals[f.id]) : 0),
+                unit: "전체기간",
+                period: pctView(f.rate) + "%",
+                status: included ? "포함" : "제외",
+                chevron: false
+              }) + "</div></div>";
+          }).join("") : '<div class="cost-empty muted small">등록된 매출연동 수수료 없음</div>')
+      });
+      var sgaParts = recGroupSummaryParts(state.recurringExpenses, "sga", state);
       sgaBody += renderCostSection({
         id: "recurring-sga",
         title: "일반 판관비",
-        summary: recGroupSummaryText(state.recurringExpenses, "sga", state),
+        amount: sgaParts.amount,
+        unit: sgaParts.unit,
+        period: sgaParts.period,
         addAction: "add-recurring",
         addAttrs: ' data-category="sga"',
         extraClass: "cost-sec-child cost-sec-flat cost-sec-group",
@@ -3708,14 +3836,14 @@
       var welfareMonthly = (result && result.months && result.months[0]) ? result.months[0].meal : 0;
       var recurringTotal = salarySum(state.employees) + recMonthlySum(state.recurringExpenses) +
         welfareMonthly + vehicleStats.sum + actorStats.sum;
-      sgaBody += '<div class="cost-foot-row cost-row-list"><span></span><span></span><span>판관비 합계</span><b>' +
-        App.Format.formatWon(recurringTotal) + '</b><span class="cost-unit">월</span><span></span><span></span></div>';
+      sgaBody += '<div class="cost-foot-row cost-row-list"><span></span><span></span><span>판관비 합계</span>' +
+        '<span class="cost-amt"><b>' + App.Format.formatWon(recurringTotal) +
+        '</b></span><span class="cost-unit">월</span><span></span><span></span></div>';
       sgaBody += "</div>";
 
       html += renderCostSection({
         id: "sga-parent",
         title: (App.SgaFamily && App.SgaFamily.label) || "판관비",
-        summary: "월 " + App.Format.formatWon(recurringTotal),
         extraClass: "cost-sec-parent cost-sec-flat",
         open: isSecOpen(ui, "sga-parent"),
         body: sgaBody
@@ -3759,7 +3887,59 @@
     return row ? itemPeriodLabel(row) : "시뮬레이션 전체";
   }
 
-  function renderRent2fTab(state) {
+  function rentComparables() {
+    return [
+      {
+        src: "assets/rent-comparables/shared-office.png",
+        title: "공유오피스 지점 시세",
+        meta: "1인실 월 35만~ · 지점별 상이",
+        note: "집기·소프트웨어·공용공간은 별도인 경우가 많음"
+      },
+      {
+        src: "assets/rent-comparables/banpo.png",
+        title: "반포동 일반상가",
+        meta: "월세 1,500 / 150만 · 계약 43㎡",
+        note: "관리비 10만 · 권리금 없음"
+      },
+      {
+        src: "assets/rent-comparables/jamwon.png",
+        title: "잠원동 일반상가",
+        meta: "월세 1,500 / 146만 · 계약 66.11㎡",
+        note: "4/5층 · 확인매물"
+      },
+      {
+        src: "assets/rent-comparables/seocho.png",
+        title: "서초동 일반상가",
+        meta: "월세 1,000 / 100만 · 계약 28.1㎡",
+        note: "4/5층 · 권리금 없음"
+      }
+    ];
+  }
+
+  function renderRentComparables(opts) {
+    opts = opts || {};
+    var html = '<section class="rent-comps">';
+    if (!opts.noTitle) html += "<h2>시장 비교군</h2>";
+    html += '<p class="muted small">근처 공유오피스·일반상가 시세입니다. 2층 월 임대료가 낮은지 보기 위한 증빙이며, 시뮬레이션 금액에는 넣지 않습니다. 그림을 누르면 원본을 엽니다.</p>';
+    html += '<div class="rent-comp-grid">';
+    rentComparables().forEach(function (item) {
+      html += '<figure class="rent-comp">';
+      html += '<a href="' + esc(item.src) + '" target="_blank" rel="noopener">';
+      html += '<img src="' + esc(item.src) + '" alt="' + esc(item.title) + '">';
+      html += "</a>";
+      html += "<figcaption>";
+      html += "<b>" + esc(item.title) + "</b>";
+      html += "<span>" + esc(item.meta) + "</span>";
+      html += '<span class="muted">' + esc(item.note) + "</span>";
+      html += "</figcaption>";
+      html += "</figure>";
+    });
+    html += "</div></section>";
+    return html;
+  }
+
+  function renderRent2fTab(state, ui) {
+    var sub = (ui && ui.rent2fTab) === "comps" ? "comps" : "included";
     var monthly = rent2fMonthlyAmount(state);
     var groups = [
       { label: "소프트웨어", items: ["더존 위하고", "Microsoft 시스템/Office", "Polaris Office", "Windows Home", "한글"] },
@@ -3769,38 +3949,54 @@
     ];
     var srcIdx = rent2fSourceIndex(state);
     var html = '<div class="rent-info">';
-    html += '<div class="rent-header-row">';
-    html += '<p class="muted small cost-intro">월 임대료 ' + App.Format.formatWon(monthly) + '에 사무공간, 소프트웨어, 유틸리티, 시설·장비 및 공용공간 사용료가 포함되어 있습니다. 아래 항목은 별도 비용으로 계산되지 않습니다.</p>';
-    html += '<div class="rent-amount-block">';
-    html += '<span class="rent-amount-label">월 임대료</span>';
+    html += '<div class="cost-tabs sim-tabs rent-subtabs">';
+    [
+      { id: "included", label: "포함 내역" },
+      { id: "comps", label: "시장 비교군" }
+    ].forEach(function (t) {
+      html += '<button type="button" class="' + (sub === t.id ? "active" : "") +
+        '" data-action="rent2f-tab" data-tab="' + t.id + '">' + esc(t.label) + "</button>";
+    });
+    html += "</div>";
+    if (sub === "comps") {
+      html += renderRentComparables({ noTitle: true });
+      html += "</div>";
+      return html;
+    }
+    html += '<div class="rent-basics">';
+    html += '<div class="rent-fact rent-basic">';
+    html += "<span>월 임대료</span>";
     if (srcIdx >= 0) {
-      html += '<div class="field rent-amount-field">' +
-        moneyInput("recurringExpenses." + srcIdx + ".amount", state.recurringExpenses[srcIdx].amount) + " / 월</div>";
-      html += "<small>운영비 &gt; 판관비 &gt; 임대료(2층) 행과 같은 값입니다 · " + esc(rent2fPeriodLabel(state)) + "</small>";
+      html += '<div class="rent-amount-field">' +
+        moneyInput("recurringExpenses." + srcIdx + ".amount", state.recurringExpenses[srcIdx].amount) +
+        " / 월</div>";
     } else {
       html += "<b>" + App.Format.formatWon(monthly) + " / 월</b>";
-      html += "<small>연동할 임대료(2층) 항목이 없습니다. 운영비 &gt; 일반 판관비에서 추가하세요.</small>";
     }
     html += "</div>";
+    html += '<div class="rent-fact rent-basic">';
+    html += "<span>적용기간</span>";
+    html += "<b>" + esc(rent2fPeriodLabel(state)) + "</b>";
     html += "</div>";
-    html += '<div class="cost-list">';
-    html += costListCols();
+    html += '<div class="rent-fact rent-basic">';
+    html += "<span>연동</span>";
+    html += srcIdx >= 0
+      ? "<b>운영비 &gt; 판관비 &gt; 임대료(2층)</b>"
+      : "<b>연동할 임대료(2층) 항목이 없습니다</b>";
+    html += "</div>";
+    html += "</div>";
+    html += '<p class="muted small cost-intro">월 임대료에 사무공간, 소프트웨어, 유틸리티, 시설·장비 및 공용공간 사용료가 포함되어 있습니다. 아래 항목은 별도 비용으로 계산되지 않습니다.</p>';
+    html += '<div class="rent-facts">';
     groups.forEach(function (g) {
-      html += costGroupLabel(g.label);
+      html += '<section class="rent-fact-group">';
+      html += "<h3>" + esc(g.label) + "</h3>";
       g.items.forEach(function (name) {
-        html += '<div class="cost-item">';
-        html += '<div class="cost-row cost-row-list">';
-        html += costSummaryCells({
-          family: "판관비",
-          account: "임대료",
-          name: name,
-          amount: "포함",
-          unit: "-",
-          period: "전체기간",
-          status: "임대료 포함"
-        });
-        html += "</div></div>";
+        html += '<div class="rent-fact">';
+        html += "<span>" + esc(name) + "</span>";
+        html += "<b>포함</b>";
+        html += "</div>";
       });
+      html += "</section>";
     });
     html += "</div>";
     html += '<p class="muted small">월별 분석에는 임대료 한 행만 반영됩니다. 위 포함 항목은 운영비나 자산 구입으로 자동 생성하지 않습니다.</p>';
@@ -3973,7 +4169,8 @@
     if (group.summaryOnly) {
       var tone = group.kind === "profit-summary" ? "ledger-profit-row" :
         (group.kind === "income-summary" || group.kind === "expense-summary" ? "ledger-key-row" : "ledger-summary-row");
-      var summaryHtml = '<tr class="sub-row ' + tone + extraRowClass + '">';
+      var kindClass = group.kind ? " ledger-kind-" + group.kind : "";
+      var summaryHtml = '<tr class="sub-row ' + tone + kindClass + extraRowClass + '">';
       summaryHtml += '<td class="sticky-g">' + esc(groupCol) + "</td>";
       summaryHtml += '<td class="sticky-n">' + esc(group.label) + "</td>";
       summaryHtml += '<td class="num sticky-t">' + App.Format.formatGrouped(group.subtotal.total) + "</td>";
@@ -4002,7 +4199,8 @@
         html += "</tr>";
       });
     }
-    html += '<tr class="sub-row ledger-toggle-row' + extraRowClass + (open ? "" : " is-collapsed") +
+    html += '<tr class="sub-row ledger-toggle-row' + (group.kind ? " ledger-kind-" + group.kind : "") +
+      extraRowClass + (open ? "" : " is-collapsed") +
       '" data-action="toggle-ledger-group" data-group="' + esc(group.id || "") +
       '" aria-expanded="' + (open ? "true" : "false") + '" title="클릭하면 세부 항목을 접거나 펼칩니다">';
     html += '<td class="sticky-g">' + esc(groupCol) + "</td>";
@@ -4030,8 +4228,14 @@
     var html = '<tr class="total-row ledger-result ledger-cashflow-item' + (extraClass ? " " + extraClass : "") + '">';
     html += '<td class="sticky-g">현금흐름</td>';
     html += '<td class="sticky-n"' + (title ? ' title="' + esc(title) + '"' : "") + ">" +
-      esc(cashflowResultLabel(row)) + "</td>";
-    html += '<td class="num sticky-t">' + App.Format.formatGrouped(row.total) + "</td>";
+      esc(cashflowResultLabel(row));
+    if (row && row.id === "closing") {
+      html += '<span class="kpi-tag kpi-tag-warn">법인세만 차감</span>';
+    }
+    html += "</td>";
+    html += '<td class="num sticky-t">' +
+      (row && row.id === "closing" ? sameAmountStar("기말 맞춤 · 시나리오 비교의 법인잔여와 같은 금액") : "") +
+      App.Format.formatGrouped(row.total) + "</td>";
     html += ledgerCells(row.values, months, selected, true, ui, {
       yearMode: row.id === "closing" ? "last" : "sum"
     });
@@ -4059,6 +4263,22 @@
           rowClass: "ledger-cashflow-item"
         });
       }
+      var dividend = ledgerGroupById(ledger, "dividend");
+      if (dividend) {
+        html += renderLedgerGroup(dividend, months, selected, gap, ui, projectExpenseGap, {
+          sectionLabel: "현금흐름",
+          foldLabel: "대표 배당",
+          rowClass: "ledger-cashflow-item"
+        });
+      }
+      var profitShare = ledgerGroupById(ledger, "profit-share");
+      if (profitShare) {
+        html += renderLedgerGroup(profitShare, months, selected, gap, ui, projectExpenseGap, {
+          sectionLabel: "현금흐름",
+          foldLabel: "수익배분",
+          rowClass: "ledger-cashflow-item"
+        });
+      }
       var otherIn = ledgerGroupById(ledger, "otherIn");
       if (otherIn) {
         html += renderLedgerGroup(otherIn, months, selected, gap, ui, projectExpenseGap, {
@@ -4077,7 +4297,8 @@
     }
     var closing = ((ledger && ledger.results) || []).filter(function (row) { return row.id === "closing"; })[0];
     if (closing) {
-      html += renderCashflowResultRow(closing, months, selected, "ledger-closing-row", "", ui);
+      html += renderCashflowResultRow(closing, months, selected, "ledger-closing-row",
+        "통장 잔액에서 아직 안 낸 법인세·주민세만 뺀 금액입니다. 미납 부가세는 빼지 않습니다.", ui);
     }
     return html;
   }
@@ -4093,18 +4314,235 @@
     return String(pct).replace(/\.0$/, "") + "%";
   }
 
-  function analysisTabs(tab) {
+  function analysisTabs(tab, ui) {
+    var selectedM = selectedMultiplierStep(ui);
+    var onFloor = tab === "revenue-floor";
     var html = '<div class="cost-tabs analysis-tabs">';
-    [
-      { id: "scenarios", label: "시나리오 비교" },
-      { id: "income-tax", label: "한눈에 비교" },
-      { id: "monthly", label: "월별 분석" },
-      { id: "revenue-floor", label: "참고(매출하한)" }
-    ].forEach(function (t) {
-      html += '<button type="button" class="' + (tab === t.id ? "active" : "") +
-        '" data-action="analysis-tab" data-tab="' + esc(t.id) + '">' + esc(t.label) + "</button>";
+    MULTIPLIER_STEPS.forEach(function (m) {
+      html += '<button type="button" class="' + (!onFloor && selectedM === m ? "active" : "") +
+        '" data-action="select-multiplier" data-m="' + m + '">' + m + "배" +
+        (m === 1 ? " · 지금" : "") + "</button>";
     });
+    html += '<button type="button" class="' + (onFloor ? "active" : "") +
+      '" data-action="analysis-tab" data-tab="revenue-floor">참고(매출하한)</button>';
     html += "</div>";
+    return html;
+  }
+
+  function multiplierBaseTotal(state) {
+    return App.Money.sumBy((state.projects || []).filter(function (p) {
+      return p.status !== "cancelled";
+    }), function (p) { return App.Engine.projectContractAmount(p); });
+  }
+
+  var MULTIPLIER_STEPS = [1, 2, 3, 4, 5];
+
+  function selectedMultiplierStep(ui) {
+    var m = ui && ui.multiplierSelected;
+    return MULTIPLIER_STEPS.indexOf(m) >= 0 ? m : 1;
+  }
+
+  function getMultiplierRun(state, result, ui, multiplier) {
+    var m = selectedMultiplierStep({ multiplierSelected: multiplier });
+    if (m === 1 || !multiplierBaseTotal(state)) {
+      return { multiplier: 1, sandbox: state, result: result, cmp: null };
+    }
+    var cache = ensureMultiplierCache(state, ui || {});
+    if (!cache.runs) cache.runs = {};
+    if (!cache.runs[m]) {
+      cache.runs[m] = multiplierScenario(state, cache.extras[m], m);
+    }
+    return cache.runs[m];
+  }
+
+  function analysisFoldOpen(ui, id) {
+    var open = ui && ui.analysisFoldOpen;
+    if (open && Object.prototype.hasOwnProperty.call(open, id)) return !!open[id];
+    var tab = (ui && ui.analysisTab) || "compare";
+    if (tab === "monthly") return id === "monthly" || id === "cash";
+    if (tab === "income-tax") return id === "glance";
+    return id === "scenarios" || id === "cash";
+  }
+
+  function renderAnalysisFold(id, title, ui, bodyFn) {
+    var open = analysisFoldOpen(ui, id);
+    var html = '<section class="analysis-fold' + (open ? " is-open" : "") + '">';
+    html += '<button type="button" class="analysis-fold-head" data-action="toggle-analysis-fold" data-id="' +
+      esc(id) + '" aria-expanded="' + (open ? "true" : "false") + '">';
+    html += '<span class="chev" aria-hidden="true"></span>' + esc(title) + "</button>";
+    if (open) html += '<div class="analysis-fold-body">' + bodyFn() + "</div>";
+    html += "</section>";
+    return html;
+  }
+
+  function renderMultiplierSummaryTable(state, ui) {
+    var scenarios = multiplierScenarios(state, ui);
+    if (!scenarios.length) return "";
+    function row(label, get, opts) {
+      opts = opts || {};
+      var r = '<tr' + (opts.strong ? ' class="strong"' : "") + '><th>' + esc(label) + "</th>";
+      scenarios.forEach(function (s) {
+        var v = get(s);
+        var text = opts.delta ? analysisDisplayAmount(v, "delta") : App.Format.formatWon(v);
+        r += '<td class="num' + (v < 0 ? " is-neg" : "") + '">' + text + "</td>";
+      });
+      return r + "</tr>";
+    }
+    var html = '<div class="card mult-summary-card"><h2>0. 배수 비교 한눈에</h2>';
+    html += '<p class="muted small">현재 등록 매출을 1배로 두고, 2~5배는 작품·영업 건을 무작위로 추가해 참고로 계산합니다. 실제 매출 계획(수익 탭)에는 반영되지 않습니다.</p>';
+    html += '<div class="mult-table-wrap"><table class="mult-table"><thead><tr><th></th>';
+    scenarios.forEach(function (s) { html += "<th>" + s.multiplier + "배</th>"; });
+    html += "</tr></thead><tbody>";
+    html += row("총매출", function (s) { return s.revenue; }, { strong: true });
+    html += row("1인 기획사 경제가치", function (s) { return s.solo; });
+    html += row("기존 회사 전속 경제가치", function (s) { return s.exclusive; });
+    html += row("차이(1인 − 전속)", function (s) { return s.delta; }, { strong: true, delta: true });
+    html += "</tbody></table></div></div>";
+    return html;
+  }
+
+  function renderAnalysisCompareView(state, result, ui) {
+    var selectedM = selectedMultiplierStep(ui);
+    var run = getMultiplierRun(state, result, ui, selectedM);
+    var viewState = run.sandbox || state;
+    var viewResult = run.result || result;
+    var html = "";
+    if (selectedM !== 1 && run.cmp) {
+      html += '<p class="muted small analysis-mult-note"><b>' + selectedM +
+        "배</b> 참고입니다. 현재 등록 매출에 작품·영업 건을 추가해 다시 계산하며, 수익 탭 계획은 바뀌지 않습니다. " +
+        '<button type="button" class="btn btn-sm" data-action="regenerate-multiples">배수 다시 생성</button></p>';
+    }
+    html += renderAnalysisConsistencyBanner(viewState, viewResult, ui);
+    html += renderMultiplierSummaryTable(state, ui);
+    html += '<div class="analysis-fold-controls">';
+    html += '<button type="button" class="btn btn-quiet" data-action="analysis-folds-collapse">전체 접기</button>';
+    html += '<button type="button" class="btn btn-quiet" data-action="analysis-folds-expand">전체 펴기</button>';
+    html += "</div>";
+    html += renderAnalysisFold("monthly", "1. 월별 분석", ui, function () {
+      return renderMonthlyLedgerCard(viewState, viewResult, ui);
+    });
+    html += renderAnalysisFold("cash", "2. 기말 현금 맞춤", ui, function () {
+      return renderAnalysisTaxKpis(viewResult, ui);
+    });
+    html += renderAnalysisFold("scenarios", "3. 시나리오 비교", ui, function () {
+      return renderScenarioComparisonView(viewState, viewResult, ui);
+    });
+    html += renderAnalysisFold("glance", "4. 한눈에 비교", ui, function () {
+      return renderPersonalTaxCalculator(state, viewResult, ui, {
+        cmp: run.cmp,
+        selectedM: selectedM
+      });
+    });
+    return html;
+  }
+
+  function ensureMultiplierCache(state, ui) {
+    var base = multiplierBaseTotal(state);
+    if (!ui.multiplierCache || ui.multiplierCache.base !== base) {
+      ui.multiplierCache = { base: base, extras: {}, runs: {} };
+    }
+    var cache = ui.multiplierCache;
+    MULTIPLIER_STEPS.forEach(function (m) {
+      if (m === 1 || cache.extras[m]) return;
+      var sandbox = JSON.parse(JSON.stringify(state));
+      var before = sandbox.projects.length;
+      App.Defaults.autoGenerateRevenuePlanToTarget(sandbox, base * m);
+      cache.extras[m] = sandbox.projects.slice(before);
+    });
+    return cache;
+  }
+
+  function multiplierScenario(state, extras, multiplier) {
+    var sandbox = JSON.parse(JSON.stringify(state));
+    if (extras && extras.length) sandbox.projects = sandbox.projects.concat(extras);
+    var result = App.Engine.runSimulation(sandbox);
+    var cmp = App.Engine.runScenarioComparison(sandbox, result);
+    return {
+      multiplier: multiplier,
+      sandbox: sandbox,
+      result: result,
+      cmp: cmp,
+      revenue: App.Money.roundWon(cmp.commonRevenue),
+      solo: App.Money.roundWon(cmp.scenarios.soloAgency.controlledEconomicValue),
+      exclusive: App.Money.roundWon(cmp.scenarios.exclusiveContract.controlledEconomicValue),
+      delta: App.Money.roundWon(cmp.deltas.controlledEconomicValue)
+    };
+  }
+
+  function multiplierScenarios(state, ui) {
+    var cache = ensureMultiplierCache(state, ui || {});
+    if (!cache.base) return [];
+    return MULTIPLIER_STEPS.map(function (m) {
+      return multiplierScenario(state, m === 1 ? [] : cache.extras[m], m);
+    });
+  }
+
+  function renderEvCompareChart(title, noteHtml, rows) {
+    if (!(rows || []).length) return "";
+    var maxEv = 0;
+    rows.forEach(function (s) {
+      maxEv = Math.max(maxEv, s.soloEV || 0, s.exclusiveEV || 0);
+    });
+    var html = '<section class="floor-sec">';
+    html += "<h3>" + esc(title) + "</h3>";
+    if (noteHtml) html += '<p class="muted small">' + noteHtml + "</p>";
+    html += '<div class="floor-chart">';
+    html += '<div class="floor-legend"><span><i class="floor-swatch solo"></i>1인 기획사</span>' +
+      "<span><i class=\"floor-swatch ex\"></i>기존 회사 전속</span></div>";
+    rows.forEach(function (s) {
+      html += '<div class="floor-chart-row' + (s.now ? " is-now" : "") + '">';
+      html += '<div class="floor-chart-label">' +
+        (s.extra || "") +
+        esc(App.Format.formatWonAbout(s.revenue).replace(/^약 /, "")) +
+        (s.now ? "<em>지금</em>" : "") + "</div>";
+      html += '<div class="floor-bars">';
+      html += '<div class="floor-bar-line"><div class="floor-bar solo" style="width:' +
+        floorBarWidth(s.soloEV, maxEv).toFixed(1) + '%"></div><b>' +
+        App.Format.formatWonAbout(s.soloEV).replace(/^약 /, "") + "</b></div>";
+      html += '<div class="floor-bar-line"><div class="floor-bar ex" style="width:' +
+        floorBarWidth(s.exclusiveEV, maxEv).toFixed(1) + '%"></div><b>' +
+        App.Format.formatWonAbout(s.exclusiveEV).replace(/^약 /, "") + "</b></div>";
+      html += "</div></div>";
+    });
+    html += "</div></section>";
+    return html;
+  }
+
+  function renderMultiplierFloorBlock(state, ui) {
+    var scenarios = multiplierScenarios(state, ui);
+    if (!scenarios.length) return "";
+    var chartRows = scenarios.map(function (s) {
+      return {
+        revenue: s.revenue,
+        soloEV: s.solo,
+        exclusiveEV: s.exclusive,
+        now: s.multiplier === 1,
+        extra: '<span class="floor-chart-factor">' + s.multiplier + "배</span>"
+      };
+    });
+    var html = renderEvCompareChart(
+      "매출이 늘면 어느 쪽이 유리한가",
+      "현재 등록 매출을 1배로 두고, 2~5배는 위 1~5배 탭과 같이 작품·영업 건을 추가해 다시 계산합니다. 위 차트(같은 믹스를 비율로 줄임)와는 구성이 다릅니다.",
+      chartRows
+    );
+    html += '<section class="floor-sec">';
+    html += "<h3>배수로 키우면 경제가치는</h3>";
+    html += '<p class="muted small">1인 기획사와 기존 회사 전속의 실질 경제가치입니다. 상세는 위 1~5배에서 월별·시나리오·한눈을 펼쳐 보면 됩니다.</p>';
+    html += '<div class="floor-panel">';
+    html += '<table class="floor-table"><thead><tr><th>배수</th><th class="num">총매출</th>' +
+      '<th class="num">1인 기획사</th><th class="num">기존 회사 전속</th><th class="num">차이</th></tr></thead><tbody>';
+    scenarios.forEach(function (s) {
+      html += '<tr class="' + (s.multiplier === 1 ? "is-now" : (s.delta >= 0 ? "ok" : "warn")) + '">';
+      html += "<td>" + s.multiplier + "배" + (s.multiplier === 1 ? " · 지금" : "") + "</td>";
+      html += '<td class="num">' + App.Format.formatWonAbout(s.revenue) + "</td>";
+      html += '<td class="num">' + App.Format.formatWonAbout(s.solo) + "</td>";
+      html += '<td class="num">' + App.Format.formatWonAbout(s.exclusive) + "</td>";
+      html += '<td class="num">' + analysisDisplayAmount(s.delta, "delta") + "</td></tr>";
+    });
+    html += "</tbody></table></div>";
+    html += '<p class="muted small"><button type="button" class="btn btn-sm" data-action="regenerate-multiples">배수 다시 생성</button> ' +
+      '<button type="button" class="btn-link" data-action="select-multiplier" data-m="2">2배로 상세 보기</button></p>';
+    html += "</section>";
     return html;
   }
 
@@ -4186,6 +4624,14 @@
     row("세후 법인 잔여이익", solo.corporateEndingCash, 0, { ex: false });
     row("대표 급여 총액", solo.earnedGross, 0, { ex: false });
     row("대표 인센티브 (급여 총액에 포함)", solo.ownerIncentiveAmount, 0, { ex: false });
+    if (App.Money.roundWon(solo.ownerDividendAmount)) {
+      row(ownerPayoutAmountLabel(solo), solo.ownerDividendAmount, 0, { ex: false });
+      row(ownerPayoutTaxLabel(solo), solo.ownerDividendTax, 0, { ex: false, tab: "income-tax" });
+    }
+    if (App.Money.roundWon(solo.ownerProfitShareAmount)) {
+      row("수익배분", solo.ownerProfitShareAmount, 0, { ex: false });
+      row(solo.ownerProfitShareTaxLabel || "사업소득세 (3.3%)", solo.ownerProfitShareTax, 0, { ex: false, tab: "income-tax" });
+    }
     row("대표 신용카드 사용분", solo.ownerCorporateCardValue, 0, { ex: false });
     row("개인 귀속소득", solo.actorGrossIncome, ex.actorGrossIncome);
     row("배우 부담 인건비", 0, ex.directorCost, { solo: false });
@@ -4494,10 +4940,26 @@
     var incomeTax = App.Money.roundWon(d.determinedTax != null ? d.determinedTax : d.incomeTax);
     var local = App.Money.roundWon(d.localIncomeTax);
     var salary = App.Money.roundWon(d.earnedGross);
+    var dividend = App.Money.roundWon(d.otherIncome);
+    var dividendTax = App.Money.roundWon(d.dividendTax);
+    var profitShare = App.Money.roundWon(d.businessIncome);
+    var profitShareTax = App.Money.roundWon(d.profitShareTax);
     var net = d.afterTaxIncome != null
       ? App.Money.roundWon(d.afterTaxIncome)
-      : App.Money.roundWon(salary - incomeTax - local);
-    return { salary: salary, incomeTax: incomeTax, localIncomeTax: local, net: net };
+      : App.Money.roundWon(salary + dividend + profitShare - incomeTax - local - dividendTax - profitShareTax);
+    return {
+      salary: salary,
+      dividend: dividend,
+      dividendTax: dividendTax,
+      profitShare: profitShare,
+      profitShareTax: profitShareTax,
+      profitShareTaxLabel: d.profitShareTaxLabel || "사업소득세 (3.3%)",
+      payoutTaxLabel: d.payoutTaxLabel || ownerPayoutTaxLabel(solo, d),
+      payoutIncomeLabel: d.payoutIncomeLabel || ownerPayoutShortLabel(solo, d),
+      incomeTax: incomeTax,
+      localIncomeTax: local,
+      net: net
+    };
   }
 
   function exclusivePersonYearView(ex, year) {
@@ -4553,21 +5015,29 @@
       '" aria-label="' + esc(label || "설명") + '">?</button>';
   }
 
-  function scenarioGroupFoot(label, amount, helpAction) {
+  function sameAmountStar(title, tone) {
+    var cls = "same-amt" + (tone === "gold" ? " same-amt-gold" : "");
+    return '<span class="' + cls + '" title="' + esc(title) + '">' +
+      '<span class="same-amt-star" aria-hidden="true">★</span>' +
+      '<span class="same-amt-txt">같은 금액</span></span>';
+  }
+
+  function scenarioGroupFoot(label, amount, helpAction, sameTitle, sameTone) {
     return '<div class="scenario-year-sum">' +
       '<span class="scenario-year-sum-arrow" aria-hidden="true">↓</span>' +
       '<span class="scenario-year-sum-k-wrap"><span class="scenario-year-sum-k">' + esc(label) + "</span>" +
       scenarioHelpButton(helpAction, label + " 설명") + "</span>" +
-      "<b>" + App.Format.formatWon(amount) + "</b></div>";
+      "<b>" + (sameTitle ? sameAmountStar(sameTitle, sameTone) : "") + App.Format.formatWon(amount) + "</b></div>";
   }
 
-  function scenarioFamilyEqRow(label, amount) {
+  function scenarioFamilyEqRow(label, amount, sameTitle, sameTone) {
     return '<div class="scenario-family-eq-row"><span>' + esc(label) + "</span><b>" +
+      (sameTitle ? sameAmountStar(sameTitle, sameTone) : "") +
       App.Format.formatWon(amount) + "</b></div>";
   }
 
-  function scenarioFamilyJoin() {
-    return '<div class="scenario-join-mini" aria-hidden="true">+</div>';
+  function scenarioFamilyJoin(sign) {
+    return '<div class="scenario-join-mini" aria-hidden="true">' + (sign === "-" ? "−" : "+") + "</div>";
   }
 
   function soloCashForEconomicValue(solo) {
@@ -4594,15 +5064,17 @@
       App.Money.sumBy(months, function (r) { return r.vatSettlement || 0; })
     );
     var funding = App.Money.roundWon(k.fundingOut);
+    var dividend = App.Money.roundWon(k.dividend);
     var cash = soloCashForEconomicValue(solo);
     var profit = App.Money.roundWon(periodAfterTax);
     var delta = App.Money.roundWon(cash - profit);
-    var explained = App.Money.roundWon(initial + otherIn + vatNet - funding);
+    var explained = App.Money.roundWon(initial + otherIn + vatNet - funding - dividend);
     return {
       initial: initial,
       otherIn: otherIn,
       vatNet: vatNet,
       funding: funding,
+      dividend: dividend,
       other: App.Money.roundWon(delta - explained),
       cash: cash,
       profit: profit,
@@ -4613,13 +5085,23 @@
   function renderSoloFamilyTotal(solo, revenue) {
     var card = App.Money.roundWon(solo.ownerCorporateCardValue);
     var profit = soloProfitForEconomicValue(solo);
-    var cashGap = App.Money.roundWon(soloCashForEconomicValue(solo) - profit);
+    var cashGap = App.Money.roundWon(
+      soloCashForEconomicValue(solo) - profit + App.Money.roundWon(solo.ownerDividendAmount)
+    );
     var rateText = scenarioEconomicValueRateText(solo.controlledEconomicValue, revenue);
     var html = '<div class="scenario-family-total">';
     html += '<div class="scenario-family-eq">';
-    html += scenarioFamilyEqRow("전체 기간 누적 세후순이익", profit);
+    html += scenarioFamilyEqRow("전체 기간 누적 세후순이익", profit,
+      "왼쪽 법인 「전체 기간 세후순이익」과 같은 금액", "gold");
     html += scenarioFamilyJoin();
     html += scenarioFamilyEqRow("대표 개인 세후 실수령", solo.actorNetIncome);
+    if (App.Money.roundWon(solo.ownerDividendAmount)) {
+      html += scenarioFamilyJoin("-");
+      html += scenarioFamilyEqRow(
+        solo.ownerDividendMode === "rate" ? "대표 배당 (영업이익 연동)" : "대표 배당 (이익잉여금 인출)",
+        solo.ownerDividendAmount
+      );
+    }
     if (card) {
       html += scenarioFamilyJoin();
       html += scenarioFamilyEqRow("대표 신용카드 사용분", card);
@@ -4670,11 +5152,17 @@
     } else if (f.taxableIncome) {
       lines.push({ label: "과세 대상 소득", amount: f.taxableIncome, sign: "in" });
     }
+    if (f.otherIncome) {
+      lines.push({ label: f.payoutIncomeLabel || "대표 배당", amount: f.otherIncome, sign: "in" });
+    }
     lines.push({ label: "과세표준", amount: f.taxableBase, sign: "result" });
     lines.push({ label: "산출세액", amount: f.assessed, sign: "out" });
     lines.push({ label: "세액공제", amount: f.taxCredit, sign: "out" });
     lines.push({ label: "결정세액", amount: f.determined, sign: "result" });
     lines.push({ label: "지방소득세", amount: f.local, sign: "out" });
+    if (f.dividendTax) {
+      lines.push({ label: f.payoutTaxLabel || "배당소득세 (15.4%)", amount: f.dividendTax, sign: "out" });
+    }
     lines.push({ label: "연도 총세액", amount: f.total, sign: "out" });
     lines.push({ label: "세후 개인 실수령", amount: f.afterTax, total: true, sign: "result" });
     return lines;
@@ -4724,16 +5212,16 @@
     html += scenarioYearColsHtml(years, function (year) {
       var v = corpYearView(result, year);
       var lines = [
-        { label: "이 해 세전이익", amount: v.preTaxProfit, sign: "result" }
+        { label: "세전이익", amount: v.preTaxProfit, sign: "result" }
       ];
       if (v.nolUsed) {
         lines.push({ label: "이월결손금 공제", amount: v.nolUsed, sign: "out" });
       }
       lines.push(
-        { label: "법인 과세표준", amount: v.taxableIncome, sign: "result" },
+        { label: "과세표준", amount: v.taxableIncome, sign: "result" },
         { label: "법인세", amount: v.corporateTax, sign: "out" },
-        { label: "법인지방소득세", amount: v.localIncomeTax, sign: "out" },
-        { label: "이 해 세후순이익", amount: v.afterTaxNet, total: true, sign: "result" }
+        { label: "지방소득세", amount: v.localIncomeTax, sign: "out" },
+        { label: "세후순이익", amount: v.afterTaxNet, total: true, sign: "result" }
       );
       return scenarioYearCol(year, lines);
     });
@@ -4743,11 +5231,13 @@
       }, 0)
     );
     var bridge = corpProfitCashBridge(result, solo, periodAfterTax);
-    html += scenarioGroupFoot("전체 기간 세후순이익", periodAfterTax, "open-scenario-corp-help");
+    html += scenarioGroupFoot("전체 기간 세후순이익", periodAfterTax, "open-scenario-corp-help",
+      "아래 1인 기획사 경제가치의 누적 세후순이익과 같은 금액", "gold");
     if (bridge.delta) {
       html += scenarioGroupFoot("손익 외 현금", bridge.delta, "open-scenario-corp-help");
     }
-    html += scenarioGroupFoot("전체 세후 법인잔여", soloCashForEconomicValue(solo), "open-scenario-corp-help");
+    html += scenarioGroupFoot("전체 세후 법인잔여", soloCashForEconomicValue(solo), "open-scenario-corp-help",
+      "위 기말 맞춤의 월말 자금 · 월별 분석 표와 같은 금액");
     html += scenarioDetailFold(ui, "scenario-corp", "법인 계산 상세 보기",
       scenarioMiniRow("총매출", solo.totalRevenue, "in") +
       scenarioMiniRow("프로젝트 직접비", solo.projectDirectTotal, "out") +
@@ -4766,6 +5256,7 @@
       (bridge.vatNet ? scenarioMiniRow("부가세 예수금−납부", bridge.vatNet, "result") : "") +
       (bridge.otherIn ? scenarioMiniRow("보증금 회수·기타입금", bridge.otherIn, "in") : "") +
       (bridge.funding ? scenarioMiniRow("보증금·자산", bridge.funding, "out") : "") +
+      (bridge.dividend ? scenarioMiniRow("대표 배당", bridge.dividend, "out") : "") +
       (bridge.other ? scenarioMiniRow("기타 현금 조정", bridge.other, "result") : "") +
       (bridge.delta ? scenarioMiniRow("손익 외 현금", bridge.delta, "result") : "") +
       scenarioMiniRow("법인 세후 잔여", bridge.cash, "result"),
@@ -4783,7 +5274,7 @@
     html += "</div>";
     html += '<div class="app-modal-body">';
     html += '<section class="app-modal-section"><h4>전체 기간 세후순이익</h4>';
-    html += '<p class="app-modal-note">「이 해 세후순이익」은 그 해 세전손익에서 당해 법인세·주민세만 뺀 금액입니다. 적자면 과세표준은 0이어도 손실이 그대로 남고, 그 결손금은 다음 해 과세표준에서 빼 세금을 줄입니다.</p>';
+    html += '<p class="app-modal-note">「세후순이익」은 그 해 세전손익에서 당해 법인세·주민세만 뺀 금액입니다. 적자면 과세표준은 0이어도 손실이 그대로 남고, 그 결손금은 다음 해 과세표준에서 빼 세금을 줄입니다.</p>';
     html += "</section>";
     if (bridge.delta) {
       html += '<section class="app-modal-section"><h4>손익 외 현금</h4>';
@@ -4793,6 +5284,7 @@
       if (bridge.vatNet) html += " 부가세 예수금−납부 " + App.Format.formatWon(bridge.vatNet) + ".";
       if (bridge.otherIn) html += " 보증금 회수·기타입금 " + App.Format.formatWon(bridge.otherIn) + ".";
       if (bridge.funding) html += " 보증금·자산 " + App.Format.formatWon(-Math.abs(bridge.funding)) + ".";
+      if (bridge.dividend) html += " 대표 배당 " + App.Format.formatWon(-Math.abs(bridge.dividend)) + ".";
       html += "</p></section>";
     }
     html += '<section class="app-modal-section"><h4>전체 세후 법인잔여</h4>';
@@ -4813,12 +5305,27 @@
     html += "<h3>대표 개인</h3>";
     html += scenarioYearColsHtml(years, function (year) {
       var v = soloPersonYearView(solo, year);
-      return scenarioYearCol(year, [
-        { label: "대표자 급여", amount: v.salary, sign: "in" },
-        { label: "근로/종합소득세", amount: v.incomeTax, sign: "out" },
-        { label: "지방소득세", amount: v.localIncomeTax, sign: "out" },
-        { label: "세후 개인 실수령", amount: v.net, total: true, sign: "result" }
-      ]);
+      var lines = [
+        { label: "급여", amount: v.salary, sign: "in" }
+      ];
+      if (v.dividend) {
+        lines.push({ label: ownerPayoutShortLabel(solo, v), amount: v.dividend, sign: "in" });
+      }
+      if (v.profitShare) {
+        lines.push({ label: "수익배분", amount: v.profitShare, sign: "in" });
+      }
+      lines.push(
+        { label: "종합소득세", amount: v.incomeTax, sign: "out" },
+        { label: "지방소득세", amount: v.localIncomeTax, sign: "out" }
+      );
+      if (v.dividendTax) {
+        lines.push({ label: narrowTaxLabel(ownerPayoutTaxLabel(solo, v)), amount: v.dividendTax, sign: "out" });
+      }
+      if (v.profitShareTax) {
+        lines.push({ label: narrowTaxLabel(v.profitShareTaxLabel || "사업소득세 (3.3%)"), amount: v.profitShareTax, sign: "out" });
+      }
+      lines.push({ label: "실수령", amount: v.net, total: true, sign: "result" });
+      return scenarioYearCol(year, lines);
     });
     html += scenarioGroupFoot("전체 세후 개인실수령", solo.actorNetIncome, "open-scenario-solo-person-help");
     var personInner = scenarioYearColsHtml(years, function (year) {
@@ -4828,6 +5335,14 @@
       scenarioMiniRow("대표자 급여", d.earnedGross != null ? d.earnedGross : solo.earnedGross, "in");
     if (solo.ownerIncentiveAmount) {
       personSum += scenarioMiniRow("대표 인센티브 (급여에 포함)", solo.ownerIncentiveAmount, "in");
+    }
+    if (solo.ownerDividendAmount) {
+      personSum += scenarioMiniRow(ownerPayoutShortLabel(solo), solo.ownerDividendAmount, "in");
+      personSum += scenarioMiniRow(ownerPayoutTaxLabel(solo), solo.ownerDividendTax, "out");
+    }
+    if (solo.ownerProfitShareAmount) {
+      personSum += scenarioMiniRow("수익배분", solo.ownerProfitShareAmount, "in");
+      personSum += scenarioMiniRow(solo.ownerProfitShareTaxLabel || "사업소득세 (3.3%)", solo.ownerProfitShareTax, "out");
     }
     personSum += scenarioMiniRow("근로소득공제", d.earnedIncomeDeduction, "out") +
       scenarioMiniRow("과세표준", d.taxableBase, "result") +
@@ -4866,10 +5381,10 @@
     html += scenarioYearColsHtml(years, function (year) {
       var v = exclusivePersonYearView(ex, year);
       return scenarioYearCol(year, [
-        { label: "배우 귀속소득", amount: v.gross, sign: "in" },
+        { label: "귀속소득", amount: v.gross, sign: "in" },
         { label: "종합소득세", amount: v.incomeTax, sign: "out" },
         { label: "지방소득세", amount: v.localIncomeTax, sign: "out" },
-        { label: "세후 개인 실수령", amount: v.net, total: true, sign: "result" }
+        { label: "실수령", amount: v.net, total: true, sign: "result" }
       ]);
     });
     html += scenarioGroupFoot("전체 세후 개인실수령", ex.actorNetIncome, "open-scenario-ex-person-help");
@@ -4926,7 +5441,7 @@
     html += '<div class="scenario-year-cols" style="grid-template-columns:minmax(0,1fr)">';
     html += '<div class="scenario-year-col">';
     html += "<h5>전체기간</h5>";
-    html += scenarioBlockLine("회사 수익배분 몫", eco.companyShare, { plus: true });
+    html += scenarioBlockLine("수익배분 몫", eco.companyShare, { plus: true });
     html += '<div class="scenario-block-head">회사 부담 비용</div>';
     html += scenarioBlockLine("진행비", eco.projectExpense, costOpt);
     html += scenarioBlockLine("밥차비", eco.lunchTruck, costOpt);
@@ -4938,7 +5453,7 @@
     eco.supportAllRows.forEach(function (p) {
       html += scenarioNestLine(p.name || "지원", p.exclusiveCompanyValue, costOpt);
     });
-    html += scenarioBlockLine("회사 부담 비용 합계", eco.companyCostTotal, { cost: true, subtotal: true });
+    html += scenarioBlockLine("비용 합계", eco.companyCostTotal, { cost: true, subtotal: true });
     var remainRateText = scenarioEconomicValueRateText(eco.economicRemaining, ex.totalRevenue);
     html += '<div class="scenario-result">';
     html += '<span class="scenario-result-k">회사 최종 잔여</span>';
@@ -5240,6 +5755,10 @@
     return {
       earnedGross: App.Money.roundWon(detail.earnedGross),
       earnedIncomeDeduction: App.Money.roundWon(detail.earnedIncomeDeduction),
+      otherIncome: App.Money.roundWon(detail.otherIncome),
+      dividendTax: App.Money.roundWon(detail.dividendTax),
+      payoutIncomeLabel: detail.payoutIncomeLabel || "대표 배당",
+      payoutTaxLabel: detail.payoutTaxLabel || "배당소득세 (15.4%)",
       taxableIncome: App.Money.roundWon(taxableIncome),
       taxableBase: App.Money.roundWon(detail.taxableBase),
       assessed: App.Money.roundWon(assessed),
@@ -5269,11 +5788,17 @@
     } else {
       html += taxResultLine("과세 대상 소득", analysisDisplayAmount(f.taxableIncome, "result"), { key: true });
     }
+    if (f.otherIncome) {
+      html += taxResultLine(f.payoutIncomeLabel || "대표 배당", analysisDisplayAmount(f.otherIncome, "in"));
+    }
     html += taxResultLine("과세표준", analysisDisplayAmount(f.taxableBase, "result"));
     html += taxResultLine("산출세액", analysisDisplayAmount(f.assessed, "out"));
     html += taxResultLine("세액공제", analysisDisplayAmount(f.taxCredit, "out"));
     html += taxResultLine("결정세액", analysisDisplayAmount(f.determined, "result"));
     html += taxResultLine("지방소득세", analysisDisplayAmount(f.local, "out"));
+    if (f.dividendTax) {
+      html += taxResultLine(f.payoutTaxLabel || "배당소득세 (15.4%)", analysisDisplayAmount(f.dividendTax, "out"));
+    }
     html += taxResultLine("연도 총세액", analysisDisplayAmount(f.total, "out"), { hl: true });
     if (f.afterTax) html += taxResultLine("세후 개인 실수령", analysisDisplayAmount(f.afterTax, "result"));
     return html;
@@ -5283,10 +5808,12 @@
     return '<tr class="scenario-mini-year"><th colspan="2">' + esc(label) + "</th></tr>";
   }
 
-  function renderPersonalTaxCalculator(state, result, ui) {
+  function renderPersonalTaxCalculator(state, result, ui, opts) {
     App.Defaults.ensureScenarioSettings(state);
     App.Defaults.ensureTaxSettings(state);
-    var cmp = App.Engine.runScenarioComparison(state, result);
+    opts = opts || {};
+    var selectedM = opts.selectedM != null ? opts.selectedM : selectedMultiplierStep(ui);
+    var cmp = opts.cmp || App.Engine.runScenarioComparison(state, result);
     var common = state.settings.personalTaxCommon || App.Defaults.defaultPersonalTaxCommon();
     var mode = common.mode === "rate" || common.mode === "auto" || common.mode === "manual" ? common.mode : "auto";
     var year = common.year || 2026;
@@ -5324,17 +5851,19 @@
 
     var ld = left.detail || {};
     var rd = right.detail || {};
-    var html = '<div class="card tax-calc-card">';
+    var html = '<div class="card tax-calc-card" data-multiplier="' + selectedM + '">';
     html += "<h2>같은 매출이라면, 실제로 얼마나 차이 날까?</h2>";
     html += '<p class="muted small">같은 매출 <b>' + App.Format.formatWon(revenue) + "</b> (" +
-      esc(App.Format.formatWonAbout(revenue)) + ") 기준입니다. 세금 계산식은 바꾸지 않고, 배우가 바로 볼 결론만 위에 둡니다.</p>";
+      esc(App.Format.formatWonAbout(revenue)) + ") 기준입니다.";
+    if (selectedM !== 1 && opts.cmp) {
+      html += " 현재 등록 매출의 " + selectedM +
+        "배로, 작품·영업 건을 추가한 참고값입니다. 수익 탭 계획은 바뀌지 않습니다.";
+    } else {
+      html += " 세금 계산식은 바꾸지 않고, 배우가 바로 볼 결론만 위에 둡니다.";
+    }
+    html += "</p>";
 
     html += '<div class="tax-hero-grid">';
-    html += '<article class="tax-hero-card">';
-    html += "<h3>기존 회사 전속</h3>";
-    html += taxHeroMetric("내가 바로 받는 돈", ex.actorNetIncome);
-    html += taxHeroMetric("지금 기준 총 경제가치", ex.controlledEconomicValue, { total: true });
-    html += "</article>";
     html += '<article class="tax-hero-card tax-hero-solo">';
     html += "<h3>1인 기획사</h3>";
     html += taxHeroMetric("내가 바로 받는 돈", solo.actorNetIncome);
@@ -5343,6 +5872,11 @@
       html += taxHeroMetric("대표 신용카드 사용분", solo.ownerCorporateCardValue, { sign: "in" });
     }
     html += taxHeroMetric("지금 기준 총 경제가치", solo.controlledEconomicValue, { total: true });
+    html += "</article>";
+    html += '<article class="tax-hero-card">';
+    html += "<h3>기존 회사 전속</h3>";
+    html += taxHeroMetric("내가 바로 받는 돈", ex.actorNetIncome);
+    html += taxHeroMetric("지금 기준 총 경제가치", ex.controlledEconomicValue, { total: true });
     html += "</article></div>";
 
     html += '<div class="tax-callout tax-decision">';
@@ -5353,6 +5887,27 @@
     html += "</div>";
 
     html += '<div class="tax-flow-grid">';
+    html += '<section class="tax-flow-col"><h3>1인 기획사 · 돈의 흐름</h3>';
+    html += taxFlowStep("총 매출", revenue, { sign: "in" });
+    html += '<div class="tax-flow-arrow">↓ 법인 운영 · 대표 급여</div>';
+    html += taxFlowStep("대표 급여", solo.earnedGross || solo.actorGrossIncome, { sign: "in" });
+    if (App.Money.roundWon(solo.ownerDividendAmount)) {
+      html += '<div class="tax-flow-arrow">↓ ' + esc(ownerPayoutShortLabel(solo)) + "</div>";
+      html += taxFlowStep(ownerPayoutShortLabel(solo), solo.ownerDividendAmount, { sign: "in" });
+    }
+    html += '<div class="tax-flow-arrow">↓ 개인 세금</div>';
+    html += taxFlowStep("개인 세금", solo.personalTax, { sign: "out" });
+    html += '<div class="tax-flow-arrow">↓</div>';
+    html += taxFlowStep("내 개인 통장에 남는 돈", solo.actorNetIncome);
+    html += '<div class="tax-flow-arrow">그리고 법인</div>';
+    html += taxFlowStep("법인세", solo.corporateTax, { sign: "out" });
+    html += taxFlowStep("전체 기간 누적 세후순이익", soloProfitForEconomicValue(solo));
+    if (App.Money.roundWon(solo.ownerCorporateCardValue)) {
+      html += taxFlowStep("대표 신용카드 사용분", solo.ownerCorporateCardValue, { sign: "in" });
+    }
+    html += '<div class="tax-flow-arrow">=</div>';
+    html += taxFlowStep("내가 보유하게 되는 전체 가치", solo.controlledEconomicValue, { total: true });
+    html += "</section>";
     html += '<section class="tax-flow-col"><h3>기존 회사 · 돈의 흐름</h3>';
     html += taxFlowStep("총 매출", revenue, { sign: "in" });
     html += '<div class="tax-flow-arrow">↓ 회사 정산</div>';
@@ -5369,23 +5924,6 @@
     html += taxFlowStep("내 개인 통장에 남는 돈", ex.actorNetIncome);
     html += '<div class="tax-flow-arrow">=</div>';
     html += taxFlowStep("내가 보유하게 되는 전체 가치", ex.controlledEconomicValue, { total: true });
-    html += "</section>";
-    html += '<section class="tax-flow-col"><h3>1인 기획사 · 돈의 흐름</h3>';
-    html += taxFlowStep("총 매출", revenue, { sign: "in" });
-    html += '<div class="tax-flow-arrow">↓ 법인 운영 · 대표 급여</div>';
-    html += taxFlowStep("대표 급여", solo.earnedGross || solo.actorGrossIncome, { sign: "in" });
-    html += '<div class="tax-flow-arrow">↓ 개인 세금</div>';
-    html += taxFlowStep("개인 세금", solo.personalTax, { sign: "out" });
-    html += '<div class="tax-flow-arrow">↓</div>';
-    html += taxFlowStep("내 개인 통장에 남는 돈", solo.actorNetIncome);
-    html += '<div class="tax-flow-arrow">그리고 법인</div>';
-    html += taxFlowStep("법인세", solo.corporateTax, { sign: "out" });
-    html += taxFlowStep("전체 기간 누적 세후순이익", soloProfitForEconomicValue(solo));
-    if (App.Money.roundWon(solo.ownerCorporateCardValue)) {
-      html += taxFlowStep("대표 신용카드 사용분", solo.ownerCorporateCardValue, { sign: "in" });
-    }
-    html += '<div class="tax-flow-arrow">=</div>';
-    html += taxFlowStep("내가 보유하게 되는 전체 가치", solo.controlledEconomicValue, { total: true });
     html += "</section></div>";
 
     html += '<div class="tax-liq-card">';
@@ -5614,12 +6152,17 @@
     return App.Format.formatWonAbout(row.revenue);
   }
 
+  function floorFactorLabel(factor) {
+    var n = Math.round(App.Money.toSafeNumber(factor) * 100) / 100;
+    return n + "배";
+  }
+
   function floorTag(ok, okText, badText) {
     return '<i class="floor-tag' + (ok ? " is-ok" : " is-warn") + '">' +
       esc(ok ? okText : badText) + "</i>";
   }
 
-  function renderRevenueFloorView(state, result) {
+  function renderRevenueFloorView(state, result, ui) {
     var floor = App.Engine.analyzeRevenueFloor(state, result);
     var monthCount = floor.monthCount || 0;
     var html = '<div class="card floor-card">';
@@ -5672,6 +6215,7 @@
         var now = s.revenue === cur.revenue;
         html += '<div class="floor-chart-row' + (now ? " is-now" : "") + '">';
         html += '<div class="floor-chart-label">' +
+          '<span class="floor-chart-factor">' + esc(floorFactorLabel(s.factor)) + "</span>" +
           esc(App.Format.formatWonAbout(s.revenue).replace(/^약 /, "")) +
           (now ? "<em>지금</em>" : "") + "</div>";
         html += '<div class="floor-bars">';
@@ -5685,6 +6229,7 @@
       });
       html += "</div></section>";
     }
+    html += renderMultiplierFloorBlock(state, ui);
 
     html += '<section class="floor-sec">';
     html += "<h3>세 가지 하한이 다른 이유</h3>";
@@ -5811,9 +6356,13 @@
     return { vat: vat, corp: corp, local: local, total: App.Money.roundWon(vat + corp + local) };
   }
 
-  function analysisTaxKpiCard(label, valueText, cls, aboutText, helpAction) {
+  function analysisTaxKpiCard(label, valueText, cls, aboutText, helpAction, extra) {
+    extra = extra || {};
     var html = '<div class="kpi' + (cls ? " " + cls : "") + '">';
     html += '<div class="label">' + esc(label);
+    if (extra.tag) {
+      html += '<span class="kpi-tag' + (extra.tagClass ? " " + extra.tagClass : "") + '">' + esc(extra.tag) + "</span>";
+    }
     if (helpAction) {
       html += '<button type="button" class="help-q" data-action="' + esc(helpAction) +
         '" aria-label="' + esc(label) + ' 상세">?</button>';
@@ -5821,6 +6370,7 @@
     html += "</div>";
     html += '<div class="value">' + esc(valueText) + "</div>";
     if (aboutText) html += '<div class="about">' + esc(aboutText) + "</div>";
+    if (extra.note) html += '<div class="kpi-note">' + esc(extra.note) + "</div>";
     html += "</div>";
     return html;
   }
@@ -5839,8 +6389,23 @@
     html += '<div class="app-modal-row"><span>법인지방소득세</span><b>' + App.Format.formatWon(detail.local) + "</b></div>";
     html += '<div class="app-modal-row app-modal-row-total"><span>합계</span><b>' + App.Format.formatWon(detail.total) + "</b></div>";
     html += "</section>";
-    html += '<p class="app-modal-note">시뮬레이션 종료 시점까지 발생했지만 아직 현금으로 납부되지 않은 법인 세금만 더한 값입니다. 이미 납부한 세금이나 대표·배우 개인 종합소득세는 포함하지 않습니다.</p>';
+    html += '<p class="app-modal-note">이미 낸 세금이나 대표·배우 개인 종합소득세는 포함하지 않습니다. 표의 월말 자금은 아직 안 낸 법인세·주민세만 빼고, 미납 부가세는 빼지 않습니다. 위 실질 가용현금만 부가세까지 뺍니다.</p>';
     html += "</div></div></div>";
+    return html;
+  }
+
+  function cashReconRow(label, amount, opts) {
+    opts = opts || {};
+    var html = '<div class="cash-recon-row' + (opts.cls ? " " + opts.cls : "") + '">';
+    html += '<span class="cash-recon-label">' + esc(label);
+    if (opts.tag) {
+      html += '<span class="kpi-tag' + (opts.tagClass ? " " + opts.tagClass : "") + '">' + esc(opts.tag) + "</span>";
+    }
+    html += "</span>";
+    html += "<b" + (opts.valueClass ? ' class="' + opts.valueClass + '"' : "") + ">" +
+      (opts.same ? sameAmountStar(opts.same) : "") +
+      (opts.minus ? "− " : "") + App.Format.formatWon(amount) + "</b>";
+    html += "</div>";
     return html;
   }
 
@@ -5849,16 +6414,35 @@
     var detail = analysisPayableTaxDetail(result);
     var endClosing = App.Money.roundWon(k.endClosing);
     var available = App.Money.roundWon(endClosing - detail.total);
-    var html = '<div class="kpis analysis-kpi-row">';
-    html += analysisTaxKpiCard("기말 현금잔액", App.Format.formatWon(endClosing), endClosing < 0 ? "bad" : "",
-      "시뮬레이션 종료월 통장 기준 현금");
+    var afterTax = App.Money.roundWon(k.endClosingAfterTax != null ? k.endClosingAfterTax : endClosing);
+    var corpLocal = App.Money.roundWon(detail.corp + detail.local);
+    var html = '<div class="analysis-cash-board">';
+    html += '<div class="cash-recon">';
+    html += '<p class="muted small">같은 기말을 통장 → 표의 월말 자금 → 실질 가용 순으로 맞춘 계산입니다.</p>';
+    html += cashReconRow("통장 잔액", endClosing, {
+      cls: endClosing < 0 ? "is-bad" : "",
+      tag: "통장"
+    });
+    html += cashReconRow("미납 법인세·주민세", corpLocal, { cls: "is-sub", minus: true });
+    html += cashReconRow("표의 월말 자금", afterTax, {
+      cls: "is-mid" + (afterTax < 0 ? " is-bad" : ""),
+      tag: "법인세만 차감",
+      tagClass: "kpi-tag-warn",
+      same: "시나리오 비교의 전체 세후 법인잔여 · 월별 분석 표와 같은 금액"
+    });
+    html += cashReconRow("미납 부가세", detail.vat, { cls: "is-sub", minus: true });
+    html += cashReconRow("실질 가용현금", available, {
+      cls: "is-total" + (available < 0 ? " is-bad" : ""),
+      tag: "부가세까지 차감",
+      valueClass: available < 0 ? "is-neg" : "is-ok"
+    });
+    html += "</div>";
+    html += '<div class="analysis-kpi-side">';
     html += analysisTaxKpiCard("납부할 세금", App.Format.formatWon(detail.total), "warn",
-      "부가세·법인세·지방소득세 중 아직 안 낸 금액", "open-analysis-tax-help");
-    html += analysisTaxKpiCard("실질 가용현금", App.Format.formatWon(available), available < 0 ? "bad" : "good",
-      "기말 현금잔액 - 납부할 세금");
+      "부가세 + 법인세 + 지방소득세", "open-analysis-tax-help");
     html += analysisTaxKpiCard("최저 잔액", App.Format.formatWon(k.minClosing), k.minClosing < 0 ? "bad" : "",
       k.minMonth ? App.Month.monthLabel(k.minMonth) : "");
-    html += "</div>";
+    html += "</div></div>";
     if (ui && ui.analysisTaxHelpOpen) html += renderAnalysisTaxHelpModal(detail);
     return html;
   }
@@ -5903,31 +6487,24 @@
   }
 
   function renderAnalysis(state, result, ui) {
-    var tab = (ui && ui.analysisTab) || "scenarios";
+    var tab = (ui && ui.analysisTab) || "compare";
+    var html = '<div class="view-analysis">';
+    html += analysisTabs(tab, ui);
+    if (tab === "revenue-floor") {
+      html += renderRevenueFloorView(state, result, ui);
+      html += "</div>";
+      return html;
+    }
+    html += renderAnalysisCompareView(state, result, ui);
+    html += "</div>";
+    return html;
+  }
+
+  function renderMonthlyLedgerCard(state, result, ui) {
     var selected = ui.selectedMonth || (result.months[0] && result.months[0].month);
     var ledger = result.ledger || { months: [], groups: [], results: [] };
     var months = ledger.months.length ? ledger.months : result.months.map(function (r) { return r.month; });
-    var html = '<div class="view-analysis">';
-    html += analysisTabs(tab);
-    html += renderAnalysisTaxKpis(result, ui);
-    html += renderAnalysisConsistencyBanner(state, result, ui);
-    if (tab === "scenarios") {
-      html += renderScenarioComparisonView(state, result, ui);
-      html += "</div>";
-      return html;
-    }
-    if (tab === "revenue-floor") {
-      html += renderRevenueFloorView(state, result);
-      html += "</div>";
-      return html;
-    }
-    if (tab === "income-tax") {
-      html += renderPersonalTaxCalculator(state, result, ui);
-      html += "</div>";
-      return html;
-    }
-
-    html += '<div class="card ledger-card">';
+    var html = '<div class="card ledger-card">';
     html += '<div class="ledger-head">';
     html += "<h2>월별 손익 · 현금흐름</h2>";
     html += '<button type="button" class="help-q" data-action="open-ledger-help" aria-label="월별 손익·현금흐름 안내">?</button>';
@@ -5949,13 +6526,11 @@
     var gap = revenueGapOf(state, result);
     var projectExpenseGap = projectExpenseGapOf(state, result);
     (ledger.groups || []).forEach(function (g) {
-      if (g.id === "funding" || g.id === "otherIn") return;
+      if (g.id === "funding" || g.id === "otherIn" || g.id === "dividend" || g.id === "profit-share") return;
       html += renderLedgerGroup(g, months, selected, gap, ui, projectExpenseGap);
     });
     html += renderLedgerCashflowBlock(ledger, months, selected, gap, ui, projectExpenseGap);
     html += "</tbody></table></div></div>";
-
-    html += "</div>";
     return html;
   }
 
@@ -6065,7 +6640,7 @@
     if (view === "costs") return renderCosts(state, result, ui);
     if (view === "analysis") return renderAnalysis(state, result, ui);
     if (view === "settings") return renderSettings(state);
-    return renderDashboard(state, result);
+    return renderDashboard(state, result, ui);
   }
 
   function budgetPeriodLabel(b) {
@@ -6112,6 +6687,7 @@
     html += '<div class="inline" style="margin-top:10px">';
     html += '<button type="button" class="btn" data-action="new-budget">+ 새 예산안 (빈 상태)</button>';
     html += '<button type="button" class="btn" data-action="new-budget-copy">+ 새 예산안 (현재 복제)</button>';
+    html += '<button type="button" class="btn danger" data-action="reset">현재 예산안을 최종 시드로 되돌리기</button>';
     html += "</div></div>";
     return html;
   }

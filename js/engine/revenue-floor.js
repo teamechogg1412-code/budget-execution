@@ -131,8 +131,9 @@
       if (App.Month.appliesInMonth && !App.Month.appliesInMonth(emp, peak.month, start, end)) return;
       var salary = App.Money.roundWon(emp.monthlySalary);
       if (!salary) return;
-      var label = emp.name || emp.role || "직원";
-      if (emp.role && emp.name && emp.role !== emp.name) label = emp.name + " / " + emp.role;
+      var label = App.Defaults.employeeListLabel
+        ? App.Defaults.employeeListLabel(emp)
+        : (emp.name || emp.role || "직원");
       people.push({ label: label, amount: salary });
     });
     return {

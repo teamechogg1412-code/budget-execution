@@ -134,6 +134,12 @@
       });
     }
 
+    var dividendLedger = ledgerSubtotal(ledger, "dividend");
+    if (dividendLedger != null) {
+      pushCheck(errors, "dividend", "대표 배당", -amt(kpis.dividend), dividendLedger,
+        "엔진 kpis.dividend", "분석 > 월별 분석 > 대표 배당");
+    }
+
     var closingRow = ledgerResultRow(ledger, "closing");
     var endClosingLedger = (closingRow && ledger.months && ledger.months.length)
       ? amt(closingRow.values[ledger.months[ledger.months.length - 1]])

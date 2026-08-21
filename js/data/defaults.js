@@ -672,8 +672,13 @@
             salaryEmployeeId: null,
             bonusAmount: 0,
             bonusMonth: null,
+            dividendMode: "rate",
             dividendAmount: 0,
-            dividendMonth: null
+            dividendRate: 0.20,
+            dividendOn: true,
+            dividendMonth: null,
+            profitShareWorkRate: 0,
+            profitShareSalesRate: 0
           },
           personalTax: defaultPersonalTaxSettings("soloAgency")
         },
@@ -868,8 +873,17 @@
           salaryEmployeeId: rawOwner.salaryEmployeeId || null,
           bonusAmount: App.Money.roundWon(rawOwner.bonusAmount),
           bonusMonth: App.Month.normalizeMonth(rawOwner.bonusMonth),
+          dividendMode: rawOwner.dividendMode === "rate" ? "rate" : "amount",
           dividendAmount: App.Money.roundWon(rawOwner.dividendAmount),
-          dividendMonth: App.Month.normalizeMonth(rawOwner.dividendMonth)
+          dividendRate: App.Money.toRatio(rawOwner.dividendRate),
+          dividendOn: rawOwner.dividendOn != null
+            ? rawOwner.dividendOn !== false
+            : (rawOwner.dividendMode === "rate"
+              ? App.Money.toRatio(rawOwner.dividendRate) > 0
+              : App.Money.roundWon(rawOwner.dividendAmount) > 0),
+          dividendMonth: App.Month.normalizeMonth(rawOwner.dividendMonth),
+          profitShareWorkRate: App.Money.toRatio(rawOwner.profitShareWorkRate),
+          profitShareSalesRate: App.Money.toRatio(rawOwner.profitShareSalesRate)
         },
         personalTax: soloTax
       },
@@ -893,6 +907,282 @@
     delete state.settings.scenarios.exclusiveContract.enabled;
     delete state.settings.scenarios.exclusiveContract.splitBasis;
     return state;
+  }
+
+  function monthIdList(months) {
+    return (months || []).map(function (m) {
+      return typeof m === "string" ? m : (m && m.month);
+    }).filter(Boolean);
+  }
+
+  function withholdingAt(amount, nationalRate, combinedRate, label, kind) {
+    var gross = App.Money.roundWon(amount);
+    if (gross <= 0) {
+      return { national: 0, local: 0, total: 0, rate: combinedRate, label: label, kind: kind };
+    }
+    var national = App.Money.roundWon(gross * nationalRate);
+    var local = App.Money.roundWon(national * 0.10);
+    return {
+      national: national,
+      local: local,
+      total: App.Money.roundWon(national + local),
+      rate: combinedRate,
+      label: label,
+      kind: kind
+    };
+  }
+
+  function ownerDividendWithholding(amount) {
+    return withholdingAt(amount, 0.14, 0.154, "배당소득세 (15.4%)", "dividend");
+  }
+
+  function ownerProfitShareWithholding(amount) {
+    return withholdingAt(amount, 0.03, 0.033, "사업소득세 (3.3%)", "business");
+  }
+
+  function isDividendOn(payout) {
+    payout = payout || {};
+    if (payout.dividendOn === false) return false;
+    if (payout.dividendOn === true) return true;
+    if (payout.dividendMode === "rate") return App.Money.toRatio(payout.dividendRate) > 0;
+    return App.Money.roundWon(payout.dividendAmount) > 0;
+  }
+
+  function clampMonthToPeriod(month, list) {
+    month = App.Month.normalizeMonth(month);
+    if (!month || !(list || []).length) return month;
+    if (list.indexOf(month) >= 0) return month;
+    if (month < list[0]) return list[0];
+    return list[list.length - 1];
+  }
+
+  function nextMarchMonth(year) {
+    return String(Number(year) + 1) + "-03";
+  }
+
+  function lastMarchInPeriod(list) {
+    var marches = (list || []).filter(function (m) { return String(m).slice(5) === "03"; });
+    return marches.length ? marches[marches.length - 1] : null;
+  }
+
+  function mergeDividendPayments(payments) {
+    var byMonth = {};
+    var order = [];
+    (payments || []).forEach(function (p) {
+      var month = App.Month.normalizeMonth(p && p.month);
+      var amount = App.Money.roundWon(p && p.amount);
+      if (!month || amount <= 0) return;
+      if (!byMonth[month]) {
+        byMonth[month] = { month: month, amount: 0, sourceYears: [] };
+        order.push(month);
+      }
+      byMonth[month].amount = App.Money.roundWon(byMonth[month].amount + amount);
+      if (p.sourceYear != null && byMonth[month].sourceYears.indexOf(p.sourceYear) < 0) {
+        byMonth[month].sourceYears.push(p.sourceYear);
+      }
+    });
+    return order.map(function (month) { return byMonth[month]; });
+  }
+
+  function yearOperatingProfit(row, fallback) {
+    if (row && row.preTaxProfit != null) return App.Money.roundWon(row.preTaxProfit);
+    if (row && row.operatingProfit != null) return App.Money.roundWon(row.operatingProfit);
+    return App.Money.roundWon(fallback);
+  }
+
+  function dividendYearsFrom(list, byYear) {
+    var years = (App.TaxYear && App.TaxYear.yearsFromMonths)
+      ? App.TaxYear.yearsFromMonths(list)
+      : [];
+    if (years.length) return years;
+    return byYear ? Object.keys(byYear).map(Number).filter(Boolean).sort(function (a, b) { return a - b; }) : [];
+  }
+
+  function resolveOwnerDividend(state, months, ctx) {
+    ensureScenarioSettings(state);
+    var payout = (((state.settings || {}).scenarios || {}).soloAgency || {}).ownerPayout || {};
+    var mode = payout.dividendMode === "rate" ? "rate" : "amount";
+    var rate = App.Money.toRatio(payout.dividendRate);
+    var on = isDividendOn(payout);
+    var list = monthIdList(months);
+    var payments = [];
+    var yearRows = [];
+    ctx = ctx && typeof ctx === "object" ? ctx : {};
+    var byYear = ctx.byYear && typeof ctx.byYear === "object" ? ctx.byYear : null;
+    var years = dividendYearsFrom(list, byYear);
+    var taxParts = ownerDividendWithholding(1);
+    if (on && mode === "rate") {
+      if (years.length) {
+        years.forEach(function (year) {
+          var row = (byYear && (byYear[year] || byYear[String(year)])) || {};
+          var op = yearOperatingProfit(row, years.length === 1 ? ctx.operatingProfit : 0);
+          var base = op > 0 ? op : 0;
+          var amount = App.Money.roundWon(base * rate);
+          var month = clampMonthToPeriod(nextMarchMonth(year), list);
+          yearRows.push({
+            year: year,
+            operatingProfit: op,
+            rate: rate,
+            amount: amount,
+            taxRate: taxParts.rate,
+            taxLabel: taxParts.label,
+            month: month
+          });
+          if (!amount) return;
+          payments.push({
+            sourceYear: year,
+            amount: amount,
+            month: month
+          });
+        });
+      } else {
+        var base = yearOperatingProfit(null, ctx.operatingProfit != null ? ctx.operatingProfit : ctx.afterTaxNet);
+        if (base < 0) base = 0;
+        var lump = App.Money.roundWon(base * rate);
+        if (lump) {
+          payments.push({
+            sourceYear: null,
+            amount: lump,
+            month: clampMonthToPeriod(lastMarchInPeriod(list) || (list.length ? list[list.length - 1] : null), list)
+          });
+        }
+      }
+    } else if (on) {
+      var amount = App.Money.roundWon(payout.dividendAmount);
+      if (amount > 0) {
+        var explicit = App.Month.normalizeMonth(payout.dividendMonth);
+        var month = explicit && list.indexOf(explicit) >= 0
+          ? explicit
+          : (lastMarchInPeriod(list) || (list.length ? list[list.length - 1] : explicit));
+        payments.push({ sourceYear: null, amount: amount, month: month });
+      }
+      years.forEach(function (year) {
+        var row = (byYear && (byYear[year] || byYear[String(year)])) || {};
+        var op = yearOperatingProfit(row, years.length === 1 ? ctx.operatingProfit : 0);
+        yearRows.push({
+          year: year,
+          operatingProfit: op,
+          rate: rate,
+          amount: 0,
+          taxRate: taxParts.rate,
+          taxLabel: taxParts.label,
+          month: clampMonthToPeriod(nextMarchMonth(year), list)
+        });
+      });
+    } else {
+      years.forEach(function (year) {
+        var row = (byYear && (byYear[year] || byYear[String(year)])) || {};
+        var op = yearOperatingProfit(row, years.length === 1 ? ctx.operatingProfit : 0);
+        yearRows.push({
+          year: year,
+          operatingProfit: op,
+          rate: rate,
+          amount: 0,
+          taxRate: taxParts.rate,
+          taxLabel: taxParts.label,
+          month: clampMonthToPeriod(nextMarchMonth(year), list)
+        });
+      });
+    }
+    payments = mergeDividendPayments(payments);
+    var total = App.Money.roundWon(payments.reduce(function (sum, p) { return sum + p.amount; }, 0));
+    return {
+      amount: total,
+      month: payments[0] ? payments[0].month : null,
+      payments: payments,
+      mode: mode,
+      rate: rate,
+      years: yearRows
+    };
+  }
+
+  function setOwnerDividendOn(state, on) {
+    ensureScenarioSettings(state);
+    var payout = state.settings.scenarios.soloAgency.ownerPayout;
+    payout.dividendOn = !!on;
+    if (on && payout.dividendMode !== "amount") payout.dividendMode = "rate";
+    if (on && payout.dividendMode === "rate" && !App.Money.toRatio(payout.dividendRate)) {
+      payout.dividendRate = 0.20;
+    }
+    return state;
+  }
+
+  function workSalesRevenueByYear(state, list) {
+    var inPeriod = {};
+    (list || []).forEach(function (m) { inPeriod[m] = true; });
+    var byYear = {};
+    function add(year, kind, amt) {
+      year = Number(year);
+      if (!year) return;
+      if (!byYear[year]) byYear[year] = { work: 0, sales: 0 };
+      byYear[year][kind] = App.Money.roundWon(byYear[year][kind] + App.Money.roundWon(amt));
+    }
+    (state.projects || []).forEach(function (p) {
+      if (!p || p.status === "cancelled") return;
+      var kind = isSalesCategory(p.category) ? "sales" : "work";
+      (p.payments || []).forEach(function (pay) {
+        var month = App.Month.normalizeMonth(pay.expectedMonth || pay.month);
+        if (!month || !inPeriod[month]) return;
+        var amt = App.Engine && App.Engine.resolvePaymentAmount
+          ? App.Engine.resolvePaymentAmount(p, pay)
+          : App.Money.roundWon(pay.amount);
+        add(App.TaxYear ? App.TaxYear.yearOf(month) : Number(String(month).slice(0, 4)), kind, amt);
+      });
+    });
+    return byYear;
+  }
+
+  function resolveOwnerProfitShare(state, months) {
+    ensureScenarioSettings(state);
+    var payout = (((state.settings || {}).scenarios || {}).soloAgency || {}).ownerPayout || {};
+    var workRate = App.Money.toRatio(payout.profitShareWorkRate);
+    var salesRate = App.Money.toRatio(payout.profitShareSalesRate);
+    var list = monthIdList(months);
+    var byYear = workSalesRevenueByYear(state, list);
+    var years = dividendYearsFrom(list, byYear);
+    var workRevenue = 0;
+    var salesRevenue = 0;
+    var workPayments = [];
+    var salesPayments = [];
+    years.forEach(function (year) {
+      var y = byYear[year] || { work: 0, sales: 0 };
+      workRevenue = App.Money.roundWon(workRevenue + y.work);
+      salesRevenue = App.Money.roundWon(salesRevenue + y.sales);
+      var month = clampMonthToPeriod(nextMarchMonth(year), list);
+      var workAmt = App.Money.roundWon(Math.max(0, y.work) * workRate);
+      var salesAmt = App.Money.roundWon(Math.max(0, y.sales) * salesRate);
+      if (workAmt) workPayments.push({ sourceYear: year, amount: workAmt, month: month });
+      if (salesAmt) salesPayments.push({ sourceYear: year, amount: salesAmt, month: month });
+    });
+    var payments = mergeDividendPayments(workPayments.concat(salesPayments));
+    var workAmount = App.Money.roundWon(Math.max(0, workRevenue) * workRate);
+    var salesAmount = App.Money.roundWon(Math.max(0, salesRevenue) * salesRate);
+    var total = App.Money.roundWon(payments.reduce(function (sum, p) { return sum + p.amount; }, 0));
+    return {
+      workRevenue: workRevenue,
+      salesRevenue: salesRevenue,
+      workRate: workRate,
+      salesRate: salesRate,
+      workAmount: workAmount,
+      salesAmount: salesAmount,
+      workPayments: workPayments,
+      salesPayments: salesPayments,
+      amount: total,
+      payments: payments,
+      tax: ownerProfitShareWithholding(total)
+    };
+  }
+
+  function setOwnerDividendMode(state, mode) {
+    ensureScenarioSettings(state);
+    state.settings.scenarios.soloAgency.ownerPayout.dividendMode = mode === "rate" ? "rate" : "amount";
+    return state;
+  }
+
+  function ownerDividendForMonth(state, month, months, ctx) {
+    var resolved = resolveOwnerDividend(state, months, ctx);
+    var found = (resolved.payments || []).filter(function (p) { return p.month === month; })[0];
+    return found ? found.amount : 0;
   }
 
   function isScenarioEnabled(state, id) {
@@ -988,7 +1278,7 @@
   function displayNameFromVehicleDeposit(name) {
     var n = String(name || "");
     if (/하이리무진/.test(n)) return "하이리무진";
-    if (/일반/.test(n)) return "일반 스텝 차량";
+    if (/일반/.test(n)) return "스텝 차량";
     var stripped = n.replace(/^차량보증금_?/, "").trim();
     return stripped || "차량";
   }
@@ -1662,6 +1952,19 @@
     return /본부장/.test(text);
   }
 
+  function isOwnerEmployee(emp) {
+    var text = ((emp && emp.role) || "") + " " + ((emp && emp.name) || "");
+    return /대표/.test(text);
+  }
+
+  function employeeListLabel(emp) {
+    if (isOwnerEmployee(emp)) return "대표자(배우)";
+    var n = String((emp && emp.name) || "").trim();
+    var r = String((emp && emp.role) || "").trim();
+    if (n && r && n !== r) return n + " / " + r;
+    return n || r || "직원";
+  }
+
   function resolveComparisonBurdenType(emp) {
     if (emp && validComparisonBurdenType(emp.comparisonBurdenType)) return emp.comparisonBurdenType;
     return inferComparisonBurdenType(emp);
@@ -1778,6 +2081,124 @@
       project.contractAmount = App.Money.roundWon(App.Money.toSafeNumber(project.episodes) * fee);
     }
     return project;
+  }
+
+  var REVENUE_GEN_POOL = [
+    { id: "drama", type: "work", weight: 5, min: 200000000, max: 900000000 },
+    { id: "ott", type: "work", weight: 3, min: 150000000, max: 600000000 },
+    { id: "movie", type: "work", weight: 2, min: 150000000, max: 500000000 },
+    { id: "variety", type: "work", weight: 2, min: 30000000, max: 150000000 },
+    { id: "performance", type: "work", weight: 1, min: 30000000, max: 120000000 },
+    { id: "other", type: "work", weight: 1, min: 50000000, max: 250000000 },
+    { id: "ad", type: "sales", weight: 3, min: 150000000, max: 350000000 },
+    { id: "ambassador", type: "sales", weight: 2, min: 100000000, max: 300000000 },
+    { id: "seeding", type: "sales", weight: 2, min: 20000000, max: 60000000 },
+    { id: "pictorial", type: "sales", weight: 2, min: 15000000, max: 30000000 },
+    { id: "magazine", type: "sales", weight: 1, min: 5000000, max: 20000000 },
+    { id: "event", type: "sales", weight: 2, min: 10000000, max: 30000000 },
+    { id: "salesOther", type: "sales", weight: 1, min: 10000000, max: 50000000 }
+  ];
+
+  function weightedPickRevenueTemplate(pool) {
+    var totalWeight = pool.reduce(function (sum, t) { return sum + t.weight; }, 0);
+    var r = Math.random() * totalWeight;
+    for (var i = 0; i < pool.length; i++) {
+      r -= pool[i].weight;
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+  }
+
+  function roundToNiceRevenueAmount(value) {
+    var unit = 5000000;
+    return Math.max(unit, Math.round(value / unit) * unit);
+  }
+
+  function fillRevenueBudget(budgetWon, pool) {
+    var chunks = [];
+    if (!pool.length) return chunks;
+    var remaining = App.Money.roundWon(budgetWon);
+    var guard = 0;
+    while (remaining > 0 && guard < 40) {
+      guard += 1;
+      var tmpl = weightedPickRevenueTemplate(pool);
+      var raw = tmpl.min + Math.random() * (tmpl.max - tmpl.min);
+      var amount = roundToNiceRevenueAmount(raw);
+      if (amount >= remaining || remaining - amount < 5000000) {
+        chunks.push({ category: tmpl.id, amount: remaining });
+        remaining = 0;
+        break;
+      }
+      chunks.push({ category: tmpl.id, amount: amount });
+      remaining -= amount;
+    }
+    if (remaining > 0 && chunks.length) chunks[chunks.length - 1].amount += remaining;
+    return chunks;
+  }
+
+  function fitPaymentsToContract(project) {
+    if (!project) return project;
+    var total = App.Engine && App.Engine.projectContractAmount
+      ? App.Engine.projectContractAmount(project)
+      : App.Money.roundWon(project.contractAmount);
+    var pays = project.payments || [];
+    if (!total || !pays.length) return project;
+    var allocated = 0;
+    var last = pays.length - 1;
+    pays.forEach(function (p, i) {
+      var amt = i === last
+        ? App.Money.roundWon(total - allocated)
+        : App.Money.roundWon(total * App.Money.toRatio(p.percentage != null ? p.percentage : 0));
+      if (amt < 0) amt = 0;
+      p.inputMode = "amount";
+      p.amount = amt;
+      p.percentage = total ? amt / total : 0;
+      allocated = App.Money.roundWon(allocated + amt);
+    });
+    return project;
+  }
+
+  function autoGenerateRevenuePlanToTarget(state, targetWon) {
+    ensureCore(state);
+    var target = App.Money.roundWon(targetWon);
+    if (!(target > 0)) return { added: 0, gap: 0 };
+    var existing = App.Money.sumBy((state.projects || []).filter(function (p) {
+      return p.status !== "cancelled";
+    }), function (p) { return App.Engine.projectContractAmount(p); });
+    var gap = target - existing;
+    if (gap <= 0) return { added: 0, gap: gap };
+
+    var period = App.Month.resolveSimulationPeriod(state);
+    var months = (period.months && period.months.length) ? period.months : [state.profile.startMonth];
+    var safeMonths = months.slice(0, Math.max(1, months.length - 5));
+    if (!safeMonths.length) safeMonths = months;
+
+    var workPool = REVENUE_GEN_POOL.filter(function (t) { return t.type === "work"; });
+    var salesPool = REVENUE_GEN_POOL.filter(function (t) { return t.type === "sales"; });
+    var workRatio = 0.6 + Math.random() * 0.2;
+    var workBudget = Math.round(gap * workRatio);
+    var salesBudget = gap - workBudget;
+    var chunks = fillRevenueBudget(workBudget, workPool).concat(fillRevenueBudget(salesBudget, salesPool));
+
+    chunks.forEach(function (chunk) {
+      var month = safeMonths[Math.floor(Math.random() * safeMonths.length)];
+      var proj = newProject(month, chunk.category, state);
+      var n = state.projects.filter(function (p) { return p.category === chunk.category; }).length + 1;
+      var catLabel = (App.Categories.filter(function (c) { return c.id === chunk.category; })[0] || {}).label || chunk.category;
+      proj.name = catLabel + " " + n;
+      proj.payments = defaultPaymentSplit(month);
+      proj.payments.forEach(function (pay) {
+        pay.expectedMonth = clampMonthToPeriod(pay.expectedMonth, months);
+      });
+      proj.shootStartMonth = month;
+      proj.shootEndMonth = month;
+      if (isSalesCategory(chunk.category)) proj.episodes = 1;
+      proj.contractAmount = chunk.amount;
+      fitPaymentsToContract(proj);
+      state.projects.push(proj);
+    });
+
+    return { added: chunks.length, gap: gap };
   }
 
   function newSalesPlan(row, amount, seq) {
@@ -2243,6 +2664,8 @@
     DEFAULT_LUNCH_TRUCK_UNIT_AMOUNT: DEFAULT_LUNCH_TRUCK_UNIT_AMOUNT,
     resolveComparisonBurdenType: resolveComparisonBurdenType,
     isDirectorLikeEmployee: isDirectorLikeEmployee,
+    isOwnerEmployee: isOwnerEmployee,
+    employeeListLabel: employeeListLabel,
     validComparisonBurdenType: validComparisonBurdenType,
     defaultSupportPolicies: defaultSupportPolicies,
     normalizeSupportPolicy: normalizeSupportPolicy,
@@ -2297,6 +2720,14 @@
     ensureInsuranceRates: ensureInsuranceRates,
     followsSimStartMonth: followsSimStartMonth,
     ensureScenarioSettings: ensureScenarioSettings,
+    resolveOwnerDividend: resolveOwnerDividend,
+    setOwnerDividendMode: setOwnerDividendMode,
+    setOwnerDividendOn: setOwnerDividendOn,
+    isDividendOn: isDividendOn,
+    ownerDividendForMonth: ownerDividendForMonth,
+    ownerDividendWithholding: ownerDividendWithholding,
+    ownerProfitShareWithholding: ownerProfitShareWithholding,
+    resolveOwnerProfitShare: resolveOwnerProfitShare,
     normalizePersonalTax: normalizePersonalTax,
     normalizePersonalTaxCommon: normalizePersonalTaxCommon,
     defaultPersonalTaxSettings: defaultPersonalTaxSettings,
@@ -2316,6 +2747,8 @@
     applySplitBasisToggle: applySplitBasisToggle,
     normalizeShareRates: normalizeShareRates,
     applyBaseRateToProject: applyBaseRateToProject,
+    autoGenerateRevenuePlanToTarget: autoGenerateRevenuePlanToTarget,
+    fitPaymentsToContract: fitPaymentsToContract,
     rateRowById: rateRowById,
     getBaseRate: getBaseRate,
     getExpectedCount: getExpectedCount,
