@@ -1305,7 +1305,6 @@
       html += "</ul></div>";
     }
     html += renderDashHero(result);
-    html += '<p class="muted small">기본 시드는 법인 설립·운영 예산 엑셀을 그대로 옮겨 둔 틀입니다. 배우명과 작품만 바꿔도 설립비·인건비·사무실·차량 구조는 같이 쓸 수 있습니다.</p>';
 
     html += '<div class="dash-split">';
     var cogsG = dashLedgerGroup(result, "cogs-total");

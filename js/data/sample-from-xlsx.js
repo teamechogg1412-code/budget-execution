@@ -1341,8 +1341,8 @@
     }
   },
   "meta": {
-    "source": "xlsx-seed",
-    "label": "1인 기획사 기본 시드",
+    "source": "final-seed",
+    "label": "최종 시드",
     "actorId": "802e40fd-d2e2-402a-baac-263aa41e04d9",
     "budgetId": "ee8811c2-2cf8-4db2-89b8-01983d2f0a2e",
     "title": "이종원",
