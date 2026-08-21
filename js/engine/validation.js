@@ -98,12 +98,22 @@
 
     var supportActorLedger = ledgerSubtotal(ledger, "support-actor");
     if (supportActorLedger != null) {
+      var vehicleLinked = { "sp-vehicle-rent": true, "sp-vehicle-insurance": true };
       var sgaPolicies = (state.settings && state.settings.supportPolicies || []).filter(function (p) {
-        return p && p.include === true && p.costClass === "sga";
+        return p && p.include === true && p.costClass === "sga" && !vehicleLinked[p.id];
       });
-      var supportSum = App.Money.sumBy(sgaPolicies, function (p) {
+      var monthKeys = (result.months || []).map(function (row) { return row.month; });
+      var simStart = monthKeys[0];
+      var simEnd = monthKeys.length ? monthKeys[monthKeys.length - 1] : simStart;
+      var supportSum = 0;
+      sgaPolicies.forEach(function (p) {
         var share = App.Money.toRatio(p.soloCompanyShareRate != null ? p.soloCompanyShareRate : 1);
-        return (App.Engine.supportPolicyMonthlyAmount ? App.Engine.supportPolicyMonthlyAmount(p, state) : 0) * share;
+        var monthly = (App.Engine.supportPolicyMonthlyAmount ? App.Engine.supportPolicyMonthlyAmount(p, state) : 0) * share;
+        if (!monthly) return;
+        monthKeys.forEach(function (m) {
+          if (!App.Month.appliesInMonth(p, m, simStart, simEnd)) return;
+          supportSum += monthly;
+        });
       });
       pushCheck(errors, "companySupport", "회사 지원비(연기수업료·PT·경락·피부관리 등)", -amt(supportSum), supportActorLedger,
         "시뮬레이션 설정 > 회사 지원", "분석 > 월별 분석 > 배우 활동지원 소계", 1);

@@ -1,7 +1,4 @@
-(function () {
-  window.App = window.App || {};
-
-  var RAW = {
+{
   "version": 1,
   "profile": {
     "actorName": "이종원",
@@ -1461,12 +1458,4 @@
       "sourceDepositId": "9c8a6bcc-53eb-471f-a355-189c6afdb331"
     }
   ]
-};
-
-  function sampleState() {
-    return App.Defaults.ensureState(JSON.parse(JSON.stringify(RAW)));
-  }
-
-  App.Sample = { load: sampleState };
-  App.Defaults.seedState = sampleState;
-})();
+}

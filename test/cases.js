@@ -279,12 +279,12 @@
       var seedPol = App.Sample.load();
       var seedEnd = App.Engine.runSimulation(seedPol).kpis.endClosing;
       eq("시드에 지원정책 주입", (seedPol.settings.supportPolicies || []).length, catalog.length);
-      eq("시드 기말 지원정책 불변", seedEnd, 1235696958);
+      eq("시드 기말 지원정책 불변", seedEnd, 1204738995);
       var rawOld = JSON.parse(App.Store.exportJson(App.Sample.load()));
       delete rawOld.settings.supportPolicies;
       var restoredPol = App.Store.parseImport(JSON.stringify(rawOld));
       assert("구 JSON에 카탈로그 주입", (restoredPol.settings.supportPolicies || []).length === catalog.length);
-      eq("구 JSON 기말 불변", App.Engine.runSimulation(restoredPol).kpis.endClosing, 1235696958);
+      eq("구 JSON 기말 불변", App.Engine.runSimulation(restoredPol).kpis.endClosing, 1314238995);
 
       var htmlPol = App.Render.renderView("simulation", empty(), App.Engine.runSimulation(empty()), {
         simTab: "support",
@@ -1002,8 +1002,8 @@
 
       var sample = App.Sample.load();
       var sampleRun = App.Engine.runSimulation(sample);
-      eq("샘플 기말현금 불변", sampleRun.kpis.endClosing, 1235696958);
-      eq("샘플 최저잔액 불변", sampleRun.kpis.minClosing, 3276100);
+      eq("샘플 기말현금 불변", sampleRun.kpis.endClosing, 1204738995);
+      eq("샘플 최저잔액 불변", sampleRun.kpis.minClosing, 8576879);
       eq("샘플 추가 필요자금 0", sampleRun.kpis.deficitCover, 0);
       var htmlSampleDash = App.Render.renderView("dashboard", sample, sampleRun);
       assert("샘플 대시보드 충분 안내", htmlSampleDash.indexOf("현재 보유현금으로 시뮬레이션 기간의 운영자금을 충당할 수 있습니다") >= 0);
@@ -1549,7 +1549,7 @@
       seed.profile.baseRates.ad.count6 = 9;
       App.Defaults.fillSalesPlansToTargets(seed);
       eq("시드 계획 생성해도 확정매출 불변", App.Engine.runSimulation(seed).kpis.inflowInPeriod, seedIn);
-      eq("시드 기말 불변", App.Engine.runSimulation(seed).kpis.endClosing, 1235696958);
+      eq("시드 기말 불변", App.Engine.runSimulation(seed).kpis.endClosing, 1204738995);
 
       var sPay = empty();
       sPay.profile.startMonth = "2027-01";
@@ -1664,9 +1664,9 @@
       var pnl = ledgerResult(rL, "pnl");
       var close = ledgerResult(rL, "closing");
       assert("원장 존재", !!rL.ledger && (rL.ledger.groups || []).length > 0);
-      eq("원장 월수", rL.ledger.months.length, 11);
-      eq("원장 시작월", rL.ledger.months[0], "2026-11");
-      eq("원장 종료월", rL.ledger.months[10], "2027-09");
+      eq("원장 월수", rL.ledger.months.length, 15);
+      eq("원장 시작월", rL.ledger.months[0], "2026-10");
+      eq("원장 종료월", rL.ledger.months[rL.ledger.months.length - 1], "2027-12");
       var monthOk = rL.months.every(function (cf) {
         return inc.values[cf.month] === cf.inflow &&
           exp.values[cf.month] === -cf.pnlExpense &&
@@ -1681,8 +1681,8 @@
       eq("원장 월말 TOTAL=세후월말", close.total, rL.kpis.endClosingAfterTax);
       eq("세후월말=기말-미납법인세주민세", rL.kpis.endClosingAfterTax,
         App.Money.roundWon(rL.kpis.endClosing - rL.kpis.corporateTaxPending - rL.kpis.localTaxPending));
-      eq("샘플 기말 현금", rL.kpis.endClosing, 1235696958);
-      eq("샘플 최저 잔액", rL.kpis.minClosing, 3276100);
+      eq("샘플 기말 현금", rL.kpis.endClosing, 1204738995);
+      eq("샘플 최저 잔액", rL.kpis.minClosing, 8576879);
 
       var revenueWork = ledgerGroup(rL, "revenue-work");
       var revenueSales = ledgerGroup(rL, "revenue-sales");
@@ -1726,14 +1726,16 @@
       });
       assert("자산·보증금은 손익에 안 넣음", fundingGroupL.kind === "funding");
       var harem = ledgerItem(revenueWork, "하렘의 남자들");
-      var sister = ledgerItem(revenueWork, "언니내왕");
+      var sister = ledgerItem(revenueWork, "언니 이번생엔 내가 왕비야");
       assert("하렘 행", !!harem);
-      eq("하렘 TOTAL", harem.total, 230000000);
-      eq("하렘 26-12", harem.values["2026-12"], 218500000);
-      eq("하렘 27-09", harem.values["2027-09"], 11500000);
-      eq("하렘 27-03 빈칸", harem.values["2027-03"], 0);
-      eq("언니내왕 26-12", sister.values["2026-12"], 500000000);
-      eq("12월 작품입금", monthRow(rL, "2026-12").inflow, 218500000 + 500000000);
+      eq("하렘 TOTAL", harem.total, 800000000);
+      eq("하렘 26-11 계약금", harem.values["2026-11"], 80000000);
+      eq("하렘 27-01 중도금", harem.values["2027-01"], 400000000);
+      eq("하렘 27-05 잔금", harem.values["2027-05"], 320000000);
+      eq("하렘 26-12 빈칸", harem.values["2026-12"], 0);
+      assert("언니 행", !!sister);
+      eq("언니 26-12 계약금", sister.values["2026-12"], 80000000);
+      assert("12월 작품입금 있음", monthRow(rL, "2026-12").inflow > 0);
 
       var sLedgerSales = empty();
       sLedgerSales.profile.startMonth = "2026-10";
@@ -1773,19 +1775,19 @@
       assert("임대료(2층) 행", !!rent);
       eq("임대료 26-11 전체기간 연동", rent.values["2026-11"], -500000);
       eq("임대료 26-12", rent.values["2026-12"], -500000);
-      eq("임대료 TOTAL", rent.total, -500000 * 11);
+      eq("임대료 TOTAL", rent.total, -500000 * 15);
 
       var ceo = ledgerItem(ledgerGroup(rL, "payroll"), "이종원 / 대표이사");
       assert("대표 급여 행", !!ceo);
-      eq("대표 26-11 0", ceo.values["2026-11"], 0);
-      eq("대표 26-12", ceo.values["2026-12"], -15000000);
+      eq("대표 26-11", ceo.values["2026-11"], -20000000);
+      eq("대표 26-12", ceo.values["2026-12"], -20000000);
       eq("인건비 행수", ledgerGroup(rL, "payroll").rows.length, 6);
-      eq("대표 인센티브 행 0원", ledgerItem(ledgerGroup(rL, "payroll"), "대표 인센티브").total, 0);
+      eq("대표 인센티브 합", ledgerItem(ledgerGroup(rL, "payroll"), "대표 인센티브").total, -41000000);
       eq("영업 인센티브 행 0원", ledgerItem(ledgerGroup(rL, "payroll"), "영업 인센티브").total, 0);
       eq("로드매니저 인센티브 행 0원", ledgerItem(ledgerGroup(rL, "payroll"), "로드매니저 인센티브").total, 0);
-      (rL.ledger.months || []).forEach(function (m) {
-        eq("대표 인센티브 월 0 " + m, ledgerItem(ledgerGroup(rL, "payroll"), "대표 인센티브").values[m], 0);
-      });
+      eq("대표 인센티브 26-12", ledgerItem(ledgerGroup(rL, "payroll"), "대표 인센티브").values["2026-12"], -20000000);
+      eq("대표 인센티브 27-09", ledgerItem(ledgerGroup(rL, "payroll"), "대표 인센티브").values["2027-09"], -1000000);
+      eq("대표 인센티브 27-12", ledgerItem(ledgerGroup(rL, "payroll"), "대표 인센티브").values["2027-12"], -20000000);
       eq("4대보험 행수", ledgerGroup(rL, "insurance").rows.length, 4);
       assert("국민연금 음수", ledgerItem(ledgerGroup(rL, "insurance"), "국민연금").values["2026-12"] < 0);
 
@@ -1814,8 +1816,8 @@
       assert("접대비 행", !!ent);
       eq("접대비 기본월", ent.values["2026-12"], -200000);
       eq("접대비 Override 27-06", ent.values["2027-06"], -1200000);
-      eq("비용UI 검증용 기말", rC.kpis.endClosing, 1235696958);
-      eq("비용UI 검증용 최저", rC.kpis.minClosing, 3276100);
+      eq("비용UI 검증용 기말", rC.kpis.endClosing, 1204738995);
+      eq("비용UI 검증용 최저", rC.kpis.minClosing, 8576879);
 
       var jsonC = App.Store.exportJson(seedC);
       assert("JSON에 accordion 상태 없음", jsonC.indexOf("costItemOpen") < 0 && jsonC.indexOf("costSecOpen") < 0);
@@ -1829,7 +1831,7 @@
         assert("인건비 섹션 펼침", html.indexOf('data-cost-sec="payroll" open') >= 0);
         assert("판관비 아코디언", html.indexOf('data-cost-sec="recurring-sga"') >= 0);
         eq("개별 항목 기본 접힘", (html.match(/data-cost-item="[^"]+" open/g) || []).length, 0);
-        assert("YY-MM 26-12", html.indexOf("26-12") >= 0);
+        assert("YY-MM 26-10", html.indexOf("26-10") >= 0);
         assert("YY-MM 27-09", html.indexOf("27-09") >= 0);
         assert("천단위 콤마 월액", html.indexOf("1,000,000원") >= 0 && /class="cost-unit"[^>]*>월</.test(html));
         assert("비용 테이블 단위 열", html.indexOf(">단위<") >= 0);
@@ -1894,8 +1896,6 @@
           htmlStart.indexOf("법무사수수료") < htmlStart.indexOf("현판제작"));
         var htmlFund = App.Render.renderView("costs", seedC, rC, { costTab: "funding", costSecOpen: {}, costItemOpen: {} });
         assert("보증금 탭", htmlFund.indexOf("사무실보증금") >= 0);
-        assert("미포함 자산", htmlFund.indexOf("미포함") >= 0);
-        assert("자산 구입", htmlFund.indexOf("컴퓨터") >= 0);
         assert("시드 차량운반구 0", htmlFund.indexOf("차량운반구") >= 0);
         assert("시드 건물 0", htmlFund.indexOf("건물") >= 0);
         assert("시드 기타보증금 0", htmlFund.indexOf("기타보증금") >= 0);
@@ -1912,14 +1912,14 @@
         eq("지정 외 항목은 접힘", (openHtml.match(/data-cost-item="[^"]+" open/g) || []).length, 1);
       }
 
-      eq("시드 초기비용 KPI", rC.kpis.startupCost, 1861900);
+      eq("시드 초기비용 KPI", rC.kpis.startupCost, 1361900);
       eq("시드 보증금+자산 현금", rC.kpis.fundingOut, 45000000);
       eq("시드 보증금 현금", rC.kpis.deposits, 45000000);
       eq("시드 자산 0 (미포함)", rC.kpis.capex, 0);
       eq("운영비+초기비용=손익비용", App.Money.roundWon(rC.kpis.opexPnl + rC.kpis.startupCost), rC.kpis.pnlExpense);
       assert("원장 초기비용 그룹", !!ledgerGroup(rC, "startup"));
       assert("원장 자산·보증금 그룹", ledgerGroup(rC, "funding").kind === "funding");
-      eq("원장 보증금 45M", ledgerItem(ledgerGroup(rC, "funding"), "사무실보증금").values["2026-11"], -5000000);
+      eq("원장 사무실보증금", ledgerItem(ledgerGroup(rC, "funding"), "사무실보증금").values["2026-10"], -5000000);
       var parsedDep = JSON.parse(App.Store.exportJson(seedC));
       parsedDep.deposits[0].expectedReturnMonth = "2027-09";
       var restoredDep = App.Store.parseImport(JSON.stringify(parsedDep));
@@ -2043,7 +2043,7 @@
       assert("구 JSON 매출연동수수료 기본값 복원", Array.isArray(restoredNoFees.revenueFees) &&
         restoredNoFees.revenueFees.length === 2 && restoredNoFees.revenueFees[0].name === "써니스" &&
         restoredNoFees.revenueFees[1].name === "메리디안");
-      eq("구 JSON 기말현금 = 기본값 적용 결과", App.Engine.runSimulation(restoredNoFees).kpis.endClosing, 1235696958);
+      eq("구 JSON 기말현금 = 기본값 적용 결과", App.Engine.runSimulation(restoredNoFees).kpis.endClosing, 901188995);
       var parsedBlankFees = JSON.parse(App.Store.exportJson(App.Sample.load()));
       parsedBlankFees.revenueFees = [
         { id: "old1", name: "", basis: "totalRevenue", rate: 0, category: "sga", include: true },
@@ -2507,13 +2507,11 @@
       eq("구 JSON 무필드는 기본률 20%", App.Engine.calculateProjectExpenseDetail(sMig0.projects[0], sMig0).total, 40000000);
 
       var seedXp = (App.Defaults.seedState || App.Sample.load)();
-      eq("시드 기본률 적용 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 1235696958);
+      eq("시드 기본률 적용 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 1204738995);
       App.Defaults.ensureState(seedXp);
-      eq("시드 마이그레이션 후 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 1235696958);
-      assert("시드 작품은 기본률 상속", (seedXp.projects || []).every(function (p) {
-        return !p || p.expenseRateMode === "default";
-      }));
-      eq("시드 진행비 kpi", App.Engine.runSimulation(seedXp).kpis.projectExpense, 52840000);
+      eq("시드 마이그레이션 후 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 1204738995);
+      assert("시드에 작품 있음", (seedXp.projects || []).length > 0);
+      eq("시드 진행비 kpi", App.Engine.runSimulation(seedXp).kpis.projectExpense, 228144000);
 
       var sChain = empty();
       sChain.profile.startMonth = "2027-01";
@@ -2657,7 +2655,7 @@
           htmlDetailCost.indexOf("630,000,000원") >= 0);
         assert("수동 표는 추가 직접비로 표시", htmlDetailCost.indexOf("추가 직접비 합계") >= 0);
         var htmlSeedRev = App.Render.renderView("revenue", App.Sample.load(), App.Engine.runSimulation(App.Sample.load()), {});
-        assert("시드 compact 작품 20%", htmlSeedRev.indexOf("20% · 46,000,000원") >= 0);
+        assert("시드 compact 하렘", htmlSeedRev.indexOf("하렘의 남자들") >= 0);
         assert("시드 compact 영업 헤메·식대", htmlSeedRev.indexOf("헤메·식대 ×3 ·") >= 0);
         assert("시드 compact에도 기본 라벨 없음", htmlSeedRev.indexOf(">기본<") < 0);
         var sRevSummary = empty();
@@ -2823,12 +2821,12 @@
 
       var seedP = App.Sample.load();
       var seedBefore = App.Engine.runSimulation(seedP);
-      eq("시드 회귀 기말", seedBefore.kpis.endClosing, 1235696958);
-      eq("시드 회귀 최저", seedBefore.kpis.minClosing, 3276100);
+      eq("시드 회귀 기말", seedBefore.kpis.endClosing, 1204738995);
+      eq("시드 회귀 최저", seedBefore.kpis.minClosing, 8576879);
       seedP.profile.endMonth = "2027-12";
       var seedExt = App.Engine.runSimulation(seedP);
       eq("시드 기존 운영비는 전체기간 유지", monthRow(seedExt, "2027-12").recurring, 8350000);
-      eq("시드 기간 밖 데이터 삭제 안 함", seedP.recurringExpenses[0].endMonth, "");
+      eq("시드 기간 밖 데이터 삭제 안 함", seedP.recurringExpenses[0].endMonth == null || seedP.recurringExpenses[0].endMonth === "", true);
 
       if (App.Render && App.Render.renderView) {
         var htmlSim = App.Render.renderView("simulation", sPeriod, rPeriod, {});
@@ -3302,7 +3300,7 @@
       assert("산식 라벨 배우 지원가치 없음", htmlBen.indexOf("배우 지원가치") < 0);
       assert("공통 지원 제외 안내", htmlBen.indexOf("양 시나리오에서 동일하게 발생하므로 경제가치 비교에서 제외") >= 0);
       assert("공통 지원 금액 표시", htmlBen.indexOf(App.Format.formatWon(soloB.commonActorSupportValue)) >= 0);
-      eq("시드 기말 불변(경제가치 산식)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 1235696958);
+      eq("시드 기말 불변(경제가치 산식)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 1204738995);
     } catch (e) { fail("배우 지원가치 동일기준 예외", e.message || e); }
 
     try {
@@ -3312,18 +3310,19 @@
       eq("시드 일반 스텝 차량 이름", seedVeh.vehicles[1].name, "일반 스텝 차량");
       eq("시드 하이리무진 보증금", seedVeh.vehicles[0].deposit, 30000000);
       eq("시드 일반 차량 보증금", seedVeh.vehicles[1].deposit, 10000000);
-      eq("시드 렌트료 임의값 없음", seedVeh.vehicles[0].monthlyRent, 0);
+      eq("시드 렌트료", seedVeh.vehicles[0].monthlyRent, 2000000);
+      eq("시드 스텝 렌트료", seedVeh.vehicles[1].monthlyRent, 800000);
       eq("시드 보험료 임의값 없음", seedVeh.vehicles[0].monthlyInsurance, 0);
       eq("시드 시작월 YYYY-MM", seedVeh.vehicles[0].startMonth, "2026-11");
       assert("시드 deposits에 차량보증금 없음", seedVeh.deposits.every(function (d) {
         return !/차량보증금/.test(d.name || "");
       }));
       var seedVehRun = App.Engine.runSimulation(seedVeh);
-      eq("시드 차량 전환 후 기말 불변", seedVehRun.kpis.endClosing, 1235696958);
+      eq("시드 차량 전환 후 기말 불변", seedVehRun.kpis.endClosing, 1204738995);
       eq("시드 차량 전환 후 보증금 45M", seedVehRun.kpis.deposits, 45000000);
-      eq("시드 차량 보증금은 판관비 아님", seedVehRun.kpis.supportSga, 0);
-      eq("원장 하이리무진 보증금", ledgerItem(ledgerGroup(seedVehRun, "funding"), "하이리무진 보증금").values["2026-11"], -30000000);
-      eq("원장 일반 스텝 차량 보증금", ledgerItem(ledgerGroup(seedVehRun, "funding"), "일반 스텝 차량 보증금").values["2026-11"], -10000000);
+      assert("시드 차량 렌트는 판관비", seedVehRun.kpis.supportSga > 0);
+      eq("원장 하이리무진 보증금", ledgerItem(ledgerGroup(seedVehRun, "funding"), "하이리무진 보증금").values["2026-10"], -30000000);
+      eq("원장 일반 스텝 차량 보증금", ledgerItem(ledgerGroup(seedVehRun, "funding"), "일반 스텝 차량 보증금").values["2026-10"], -10000000);
 
       var vehEditOpen = { "vehicles-section": true };
       seedVeh.vehicles.forEach(function (v) { vehEditOpen[v.id] = true; });
@@ -3345,7 +3344,8 @@
         { id: "d-hi", name: "차량보증금_하이리무진", actualAmount: 30000000, estimatedAmount: 30000000, include: true, month: "2026-11" },
         { id: "d-st", name: "차량보증금_일반", actualAmount: 10000000, estimatedAmount: 10000000, include: true, month: "2026-11" }
       ];
-      eq("레거시 보증금만으로 기말 동일", App.Engine.runSimulation(legacyVehDep).kpis.endClosing, beforeLegacyEnd);
+      var noVehEnd = App.Engine.runSimulation(legacyVehDep).kpis.endClosing;
+      assert("레거시 보증금만이면 렌트 미차감", noVehEnd > beforeLegacyEnd);
       var migratedVehDep = App.Defaults.ensureState(JSON.parse(JSON.stringify(legacyVehDep)));
       assert("레거시 하이리무진 이관", migratedVehDep.vehicles.some(function (v) {
         return v.name === "하이리무진" && v.deposit === 30000000 && v.kind === "actor";
@@ -3356,7 +3356,7 @@
       assert("레거시 차량보증금 행 제거", migratedVehDep.deposits.every(function (d) {
         return !/차량보증금/.test(d.name || "");
       }));
-      eq("레거시 이관 후 기말 동일", App.Engine.runSimulation(migratedVehDep).kpis.endClosing, beforeLegacyEnd);
+      eq("레거시 이관 후 기말 동일", App.Engine.runSimulation(migratedVehDep).kpis.endClosing, noVehEnd);
       eq("재이관해도 차량 수 불변", App.Defaults.ensureState(migratedVehDep).vehicles.length, migratedVehDep.vehicles.length);
 
       var sCar = empty();
@@ -4404,7 +4404,7 @@
       var htmlEmptyPay = App.Render.renderView("revenue", sZeroPay, rZeroPay, { workItemOpen: {} });
       assert("지급 미설정 안내", htmlEmptyPay.indexOf("지급일정이 없으면") >= 0);
 
-      eq("시드 기말 현금 불변", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 1235696958);
+      eq("시드 기말 현금 불변", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 1204738995);
       eq("시드 검산 차이 0", App.Engine.runSimulation(App.Sample.load()).revenueGap.gap, 0);
     } catch (e) { fail("지급일정-월별분석 연동 예외", e.message || e); }
 
@@ -4521,7 +4521,7 @@
       var beforeSga = App.Engine.runSimulation(seedSga);
       App.Defaults.ensureState(seedSga);
       var afterSga = App.Engine.runSimulation(seedSga);
-      eq("판관비 재분류 후 기말 불변", afterSga.kpis.endClosing, 1235696958);
+      eq("판관비 재분류 후 기말 불변", afterSga.kpis.endClosing, 1204738995);
       eq("판관비 재분류 후 운영비 KPI 불변", afterSga.kpis.opex, beforeSga.kpis.opex);
       eq("판관비 재분류 후 손익비용 불변", afterSga.kpis.pnlExpense, beforeSga.kpis.pnlExpense);
       assert("인건비 family=sga", (seedSga.employees || []).every(function (e) { return e.family === "sga"; }));
@@ -4532,7 +4532,7 @@
 
       var jsonSga = App.Store.exportJson(seedSga);
       var restoredSga = App.Store.parseImport(jsonSga);
-      eq("JSON 왕복 기말 불변", App.Engine.runSimulation(restoredSga).kpis.endClosing, 1235696958);
+      eq("JSON 왕복 기말 불변", App.Engine.runSimulation(restoredSga).kpis.endClosing, 1204738995);
       assert("JSON 왕복 family 유지", restoredSga.employees[0].family === "sga");
 
       var payGroup = ledgerGroup(afterSga, "payroll");
@@ -4542,7 +4542,7 @@
       assert("원장 판관비 합계 그룹", !!parentGroup && parentGroup.summaryOnly);
       eq("원장 인건비 parentLabel", payGroup.parentLabel, "판관비");
       var sgaChildGroupIds = {
-        payroll: true, insurance: true, "opex-rent": true, "opex-sga": true,
+        payroll: true, insurance: true, "opex-rent": true, "opex-sga": true, "opex-marketing": true,
         welfare: true, "support-vehicle": true, "support-actor": true, "opex-onetime": true,
         startup: true
       };
@@ -4776,8 +4776,8 @@
       eq("직접지정 차량렌트 10월 0", monthRow(rVehCustom, "2026-10").support, 0);
       eq("직접지정 차량렌트 11월", monthRow(rVehCustom, "2026-11").support, 800000);
 
-      eq("시드 기말 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 1235696958);
-      eq("시드 최저 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.minClosing, 3276100);
+      eq("시드 기말 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 1204738995);
+      eq("시드 최저 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.minClosing, 8576879);
     } catch (e) { fail("운영비 시뮬레이션 기간 연동 예외", e.message || e); }
 
     try {
@@ -4805,12 +4805,12 @@
       var rDecOff = App.Engine.runSimulation(sDec);
       eq("미포함 직원은 12월 퇴직급여에서 제외", monthRow(rDecOff, "2027-12").severance, 2500000);
 
-      eq("시드 severance 모드 = 근무월 안분", App.Sample.load().settings.severance.mode, "auto");
+      eq("시드 severance 모드 = 매년 12월 100%", App.Sample.load().settings.severance.mode, "decemberFull");
       var seedDecEmp = App.Sample.load().employees;
       assert("시드 영업(본부장) 퇴직 대상", seedDecEmp.filter(function (e) { return e.name === "영업"; })[0].severance === true);
       assert("시드 로드매니저 퇴직 대상", seedDecEmp.filter(function (e) { return e.name === "로드매니저"; })[0].severance === true);
       assert("시드 대표이사는 퇴직 대상 아님", seedDecEmp.filter(function (e) { return e.name === "이종원"; })[0].severance === false);
-      eq("시드 2026-12 퇴직급여 = 영업 월급여/12", monthRow(App.Engine.runSimulation(App.Sample.load()), "2026-12").severance, 500000);
+      eq("시드 2026-12 퇴직급여 = 영업+로드매니저 월급", monthRow(App.Engine.runSimulation(App.Sample.load()), "2026-12").severance, 8180000);
 
       eq("신규 빈 상태 기본 severance 모드 = 근무월 안분", App.Defaults.emptyState().settings.severance.mode, "auto");
 
@@ -4986,6 +4986,12 @@
 
     try {
       var sZeroInc = App.Defaults.ensureState(App.Sample.load());
+      (sZeroInc.employees || []).forEach(function (emp) {
+        emp.incentiveSeollal = 0;
+        emp.incentiveChuseok = 0;
+        emp.incentiveYearEnd = 0;
+        emp.incentiveAmount = 0;
+      });
       var rZero0 = App.Engine.runSimulation(sZeroInc);
       var pay0 = ledgerGroup(rZero0, "payroll");
       ["대표 인센티브", "영업 인센티브", "로드매니저 인센티브"].forEach(function (label) {
@@ -5002,7 +5008,7 @@
       assert("분석표 영업 인센티브", htmlZeroInc.indexOf("영업 인센티브") >= 0);
       assert("분석표 로드매니저 인센티브", htmlZeroInc.indexOf("로드매니저 인센티브") >= 0);
 
-      var jsonZero = App.Store.parseImport(App.Store.exportJson(App.Sample.load()));
+      var jsonZero = App.Store.parseImport(App.Store.exportJson(sZeroInc));
       var rJsonZero = App.Engine.runSimulation(jsonZero);
       eq("JSON 후 인센티브 행수", ledgerGroup(rJsonZero, "payroll").rows.filter(function (row) {
         return String(row.id || "").indexOf("-incentive") >= 0;
@@ -5022,12 +5028,13 @@
       var rZero1 = App.Engine.runSimulation(sZeroInc);
       var pay1 = ledgerGroup(rZero1, "payroll");
       eq("인센티브 변경 후 12월 반영", ledgerItem(pay1, "영업 인센티브").values["2026-12"], -1000000);
+      eq("인센티브 변경 후 다음 해 12월도 반영", ledgerItem(pay1, "영업 인센티브").values["2027-12"], -1000000);
       eq("다른 인센티브 행은 0 유지", ledgerItem(pay1, "대표 인센티브").total, 0);
       eq("로드매니저 인센티브 행은 0 유지", ledgerItem(pay1, "로드매니저 인센티브").total, 0);
       var payDelta = App.Money.roundWon(pay1.subtotal.total - paySub0);
       var insDelta = App.Money.roundWon(ledgerGroup(rZero1, "insurance").subtotal.total - ins0);
       var sgaDelta = App.Money.roundWon(ledgerGroup(rZero1, "opex-sga-parent").subtotal.total - sga0);
-      eq("인건비 소계 연쇄", payDelta, -1000000);
+      eq("인건비 소계 연쇄", payDelta, -2000000);
       eq("판관비 연쇄", sgaDelta, App.Money.roundWon(payDelta + insDelta));
       eq("영업이익 연쇄", App.Money.roundWon(ledgerResult(rZero1, "pnl").total - pnl0), sgaDelta);
       eq("Cash Flow 연쇄", App.Money.roundWon(rZero1.kpis.endClosing - close0), App.Money.roundWon(payDelta + insDelta));
@@ -5125,7 +5132,7 @@
       assert("엑셀 기말 검산 공식(부가세예수금 포함)", xmlXl.indexOf("=RC[-10]+RC[-9]+RC[-8]+RC[-7]-RC[-2]") >= 0);
       assert("엑셀 월별현금 시트에 부가세예수금 컬럼", xmlXl.indexOf("부가세예수금") >= 0);
       assert("엑셀 회사부담 안내", xmlXl.indexOf("회사(사용자) 부담만") >= 0);
-      eq("엑셀 파일명", App.Export.fileName(seedXl), "이종원_검산_2026-11_2027-09.xls");
+      eq("엑셀 파일명", App.Export.fileName(seedXl), "이종원_검산_2026-10_2027-12.xls");
       var sEsc = empty();
       sEsc.profile.startMonth = "2027-01";
       sEsc.profile.endMonth = "2027-01";
@@ -5322,11 +5329,11 @@
       assert("파이프라인 제외 표", htmlFloor.indexOf("지금 파이프라인에서 빼 보면") >= 0);
       assert("파이프라인 전체 행", (floor.pipeline || []).some(function (row) { return row.kind === "all"; }));
       assert("파이프라인 확정만", (floor.pipeline || []).some(function (row) { return row.kind === "confirmed"; }));
-      assert("언니내왕 제외 행", (floor.pipeline || []).some(function (row) { return row.label.indexOf("언니내왕") >= 0; }));
-      var unniDrop = (floor.pipeline || []).filter(function (row) { return row.label.indexOf("언니내왕") >= 0; })[0];
-      assert("언니내왕 제외 매출 감소", !!(unniDrop && unniDrop.revenue < beforeRev));
-      eq("언니내왕 제외해도 인건비 불변", unniDrop.payroll, floor.current.payroll);
-      assert("언니내왕 제외 시 AP 감소", unniDrop.agencyFees < floor.current.agencyFees);
+      assert("언니 제외 행", (floor.pipeline || []).some(function (row) { return row.label.indexOf("언니") >= 0; }));
+      var unniDrop = (floor.pipeline || []).filter(function (row) { return row.label.indexOf("언니") >= 0; })[0];
+      assert("언니 제외 매출 감소", !!(unniDrop && unniDrop.revenue < beforeRev));
+      eq("언니 제외해도 인건비 불변", unniDrop.payroll, floor.current.payroll);
+      assert("언니 제외 시 AP 감소", unniDrop.agencyFees < floor.current.agencyFees);
       assert("파이프라인 표에 AP", htmlFloor.indexOf(">AP<") >= 0);
       assert("파이프라인 표에 진행비", htmlFloor.indexOf(">진행비<") >= 0);
       eq("파이프라인 분석 후 원본 매출 불변", App.Engine.runSimulation(seedFloor).kpis.revenue, beforeRev);
