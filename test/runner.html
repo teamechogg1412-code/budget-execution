@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>1인 기획사 시뮬레이터 테스트</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 32px; background: #f4f1ea; color: #1c1917; }
+    h1 { font-size: 20px; }
+    .summary { font-size: 28px; font-weight: 700; margin: 12px 0 24px; }
+    .ok { color: #166534; }
+    .bad { color: #b42318; }
+    li { margin: 6px 0; }
+    .fail { color: #b42318; }
+  </style>
+</head>
+<body>
+  <h1>엔진 테스트</h1>
+  <div id="summary" class="summary">실행 중…</div>
+  <ol id="list"></ol>
+  <script src="../js/money.js"></script>
+  <script src="../js/month.js"></script>
+  <script src="../js/holidays-kr.js"></script>
+  <script src="../js/calendar.js"></script>
+  <script src="../js/format.js"></script>
+  <script src="../js/data/categories.js"></script>
+  <script src="../js/data/defaults.js"></script>
+  <script src="../js/engine/revenue.js"></script>
+  <script src="../js/engine/expense.js"></script>
+  <script src="../js/engine/payroll.js"></script>
+  <script src="../js/engine/tax.js"></script>
+  <script src="../js/engine/cashflow.js"></script>
+  <script src="../js/engine/ledger.js"></script>
+  <script src="../js/engine/index.js"></script>
+  <script src="../js/engine/scenarios.js"></script>
+  <script src="../js/supabase-config.js"></script>
+  <script src="../js/store.js"></script>
+  <script src="../js/remote-store.js"></script>
+  <script src="../js/data/sample-from-xlsx.js"></script>
+  <script src="cases.js"></script>
+  <script>
+    (function () {
+      var out = App.Tests.run();
+      var summary = document.getElementById("summary");
+      summary.textContent = "PASS " + out.passed + " / FAIL " + out.failed;
+      summary.className = "summary " + (out.failed ? "bad" : "ok");
+      var list = document.getElementById("list");
+      out.results.forEach(function (r) {
+        var li = document.createElement("li");
+        li.textContent = (r.ok ? "PASS" : "FAIL") + " — " + r.name + (r.detail ? " (" + r.detail + ")" : "");
+        if (!r.ok) li.className = "fail";
+        list.appendChild(li);
+      });
+    })();
+  </script>
+</body>
+</html>

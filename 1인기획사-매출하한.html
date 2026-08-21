@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1인 기획사 매출 하한</title>
+  <style>
+    :root {
+      --bg: #efe8d8;
+      --paper: #fbf7ee;
+      --ink: #241c15;
+      --muted: #6f6458;
+      --line: #d7cbb8;
+      --accent: #1f5c4d;
+      --warn: #8c3a1e;
+      --chip: #e7dcc8;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--ink); }
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 28px 24px 64px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 16px; margin: 28px 0 10px; }
+    p { margin: 0 0 10px; color: var(--ink); }
+    .muted { color: var(--muted); font-size: 13px; }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0 16px;
+    }
+    .kpi {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .kpi b { display: block; font-size: 22px; letter-spacing: -0.03em; }
+    .kpi span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .note {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+    th { font-size: 12px; color: var(--muted); font-weight: 700; background: var(--chip); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr:last-child td { border-bottom: 0; }
+    tr.warn td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+    tr.ok td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+    .chart {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 16px 8px;
+    }
+    .chart-row { display: grid; grid-template-columns: 72px 1fr; gap: 10px; align-items: center; margin: 8px 0; }
+    .chart-label { font-size: 12px; color: var(--muted); }
+    .bars { display: flex; flex-direction: column; gap: 4px; }
+    .bar {
+      height: 14px;
+      border-radius: 3px;
+      min-width: 2px;
+    }
+    .bar.solo { background: var(--accent); }
+    .bar.ex { background: #b7a790; }
+    .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+    .two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 8px;
+    }
+    @media (max-width: 720px) {
+      .kpis, .two { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>1인 기획사 구조가 성립하는 매출</h1>
+    <p class="muted">시드 인건비·운영비·시작자금을 유지한 채, 같은 11개월(2026-11 ~ 2027-09) 매출만 줄여 엔진으로 다시 계산한 결과입니다. 전속은 배우 70% / 회사 30%. 1인 기획사 경제가치는 전체 기간 누적 세후순이익 + 대표 세후 실수령 + 대표 신용카드 사용분입니다. 손익 외 현금은 법인 통장에는 남지만 경제가치 비교에는 넣지 않습니다.</p>
+    <p class="muted">이 파일은 당시 시드 스냅샷입니다. 시뮬레이터 <b>분석 &gt; 참고(매출하한)</b>에서는 지금 저장본 비용·매출로 다시 계산합니다.</p>
+
+    <div class="kpis">
+      <div class="kpi"><b>약 4.9억</b><span>전속보다 경제가치가 커지는 매출</span></div>
+      <div class="kpi"><b>약 6.0억</b><span>영업이익이 플러스로 바뀌는 매출</span></div>
+      <div class="kpi"><b>약 6.5억</b><span>시작자금 6,000만으로 통장이 안 깨지는 매출</span></div>
+    </div>
+
+    <div class="note">
+      지금 시드 매출 <b>23.3억</b>(확정 드라마 14.3억 + 광고 예상 9억)이면 1인 기획사 경제가치 14.1억, 전속 6.4억입니다. 광고가 전부 빠져도, 언니내왕이 없어도 아래 하한은 넘습니다.
+    </div>
+
+    <h2>매출이 줄면 어느 쪽이 유리한가</h2>
+    <p class="muted">막대 길이는 경제가치(억원). 1인 기획사는 고정비가 커서 매출이 낮을수록 전속에 밀리고, 약 4.9억을 넘으면 역전합니다. 최대 눈금 14.1억.</p>
+    <div class="chart">
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--accent)"></i>1인 기획사 경제가치</span>
+        <span><i class="swatch" style="background:#b7a790"></i>기존 회사 전속 경제가치</span>
+      </div>
+      <div class="chart-row"><div class="chart-label">3.5억</div><div class="bars"><div class="bar solo" style="width:2.1%"></div><div class="bar ex" style="width:5.5%"></div></div></div>
+      <div class="chart-row"><div class="chart-label">4.7억</div><div class="bars"><div class="bar solo" style="width:7.9%"></div><div class="bar ex" style="width:8.5%"></div></div></div>
+      <div class="chart-row"><div class="chart-label">5.1억</div><div class="bars"><div class="bar solo" style="width:10.2%"></div><div class="bar ex" style="width:9.6%"></div></div></div>
+      <div class="chart-row"><div class="chart-label">7.0억</div><div class="bars"><div class="bar solo" style="width:19.4%"></div><div class="bar ex" style="width:13.7%"></div></div></div>
+      <div class="chart-row"><div class="chart-label">11.3억</div><div class="bars"><div class="bar solo" style="width:38.2%"></div><div class="bar ex" style="width:21.7%"></div></div></div>
+      <div class="chart-row"><div class="chart-label">14.3억</div><div class="bars"><div class="bar solo" style="width:53.6%"></div><div class="bar ex" style="width:28.1%"></div></div></div>
+      <div class="chart-row"><div class="chart-label">23.3억</div><div class="bars"><div class="bar solo" style="width:100%"></div><div class="bar ex" style="width:45.3%"></div></div></div>
+    </div>
+    <p class="muted">11.3억은 언니내왕 제외, 14.3억은 확정 드라마만, 23.3억은 시드 전체. 부가세 현금흐름이 반영된 현재 엔진 기준입니다.</p>
+
+    <h2>세 가지 하한이 다른 이유</h2>
+    <table>
+      <thead>
+        <tr><th>기준</th><th class="num">11개월 매출</th><th class="num">연환산</th><th>의미</th></tr>
+      </thead>
+      <tbody>
+        <tr class="warn"><td>전속 대비 경제가치</td><td class="num">약 4.9억</td><td class="num">약 5.3억</td><td>이보다 낮으면 전속이 더 유리</td></tr>
+        <tr><td>영업이익 흑자</td><td class="num">약 6.0억</td><td class="num">약 6.5억</td><td>수수료·인건비·운영비를 커버</td></tr>
+        <tr><td>통장 유지 (시작 6,000만)</td><td class="num">약 6.5억</td><td class="num">약 7.1억</td><td>최저잔액이 마이너스로 안 내려감</td></tr>
+        <tr class="ok"><td>여유 있게 운영</td><td class="num">10억 이상</td><td class="num">11억 이상</td><td>한 작품이 빠져도 구조가 버팀</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">연환산은 11개월 금액을 12/11배로 단순 환산한 참고치입니다. 입금 타이밍은 반영하지 않습니다.</p>
+
+    <div class="two">
+      <div>
+        <h2>이 구조의 월 고정 부담</h2>
+        <p class="muted">직원이 다 들어온 달(2027-01~) 기준, 작품 입금이 없어도 약 3,800만~4,800만원이 나갑니다.</p>
+        <table>
+          <thead><tr><th>항목</th><th class="num">월 규모</th></tr></thead>
+          <tbody>
+            <tr><td>대표 급여</td><td class="num">1,500만</td></tr>
+            <tr><td>영업(본부장급)</td><td class="num">600만</td></tr>
+            <tr><td>로드매니저</td><td class="num">250만</td></tr>
+            <tr><td>4대보험·퇴직·식대</td><td class="num">약 600만</td></tr>
+            <tr><td>월 운영비(임대·카드·기장 등)</td><td class="num">835만</td></tr>
+          </tbody>
+        </table>
+        <p class="muted">11개월 인건비 합계 2.58억, 판관비 2.47억. 시드 성사수수료 합계는 6.06억입니다.</p>
+      </div>
+      <div>
+        <h2>지금 파이프라인에 대입</h2>
+        <table>
+          <thead><tr><th>구성</th><th class="num">매출</th><th>1인 vs 전속</th></tr></thead>
+          <tbody>
+            <tr class="ok"><td>시드 전체</td><td class="num">23.3억</td><td>1인이 +7.7억</td></tr>
+            <tr class="ok"><td>확정 드라마만</td><td class="num">14.3억</td><td>1인이 +3.6억</td></tr>
+            <tr class="ok"><td>언니내왕 제외</td><td class="num">11.3억</td><td>1인이 +2.3억</td></tr>
+            <tr class="warn"><td>하렘만</td><td class="num">2.3억</td><td>전속이 유리, 적자</td></tr>
+          </tbody>
+        </table>
+        <p class="muted">시작 통장 6,000만 + 보증금·설립비가 11월에 나갑니다. 첫 작품 입금이 12월 이전이면 그 달은 매출과 무관하게 잔액이 거의 바닥입니다.</p>
+      </div>
+    </div>
+
+    <h2>한 줄로</h2>
+    <p>이 인건비·사무실 규모를 유지한다면, 같은 11개월에 매출 <b>6~7억</b>은 나와야 구조가 버팁니다. 전속과 비교해서 1인 기획사를 택할 이유는 약 <b>4.9억</b>부터 생기고, <b>10억</b>이 넘으면 한 작품이 빠져도 여유입니다. 지금 시드 23.3억은 그 질문에 대한 답이 “이미 충분하다” 쪽입니다.</p>
+    <p class="muted">인건비를 줄이거나, 법인카드 500만/월을 낮추거나, 시작자금을 더 넣으면 하한은 내려갑니다. 배우 활동지원을 시드처럼 0원으로 둔 결과이며, 저장본에서 지원비를 켜면 현금 하한은 더 올라갑니다.</p>
+  </div>
+</body>
+</html>

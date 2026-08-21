@@ -1,0 +1,9 @@
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+node_modules/
+.claude/
+excel_dump.json
+index - 복사본*.html
