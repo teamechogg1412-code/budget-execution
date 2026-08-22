@@ -4708,7 +4708,6 @@
     html += '<p class="app-modal-note">수익배분도 설계함/설계안함입니다. 설계함이면 그 해 매출 × 그 해 율입니다.</p>';
     html += '<p class="app-modal-note">배당 칸의 영업이익은 위 급여·수익배분을 반영한 값입니다. 반영함이면 율을 넣는 즉시 그 해 영업이익 × 율로 배당액이 나옵니다. 반영안함이면 배당액과 하단 합계에 넣지 않습니다. 영업이익이 마이너스인 해는 0원입니다.</p>';
     html += '<p class="app-modal-note">이 값으로 계산하기를 누르면 하단 월별 분석·기말 현금 표에 반영됩니다. 설정 탭 값은 바뀌지 않습니다. 기존값으로 되돌리면 넣어보기와 표가 지금 값으로 돌아갑니다.</p>';
-    html += '<p class="app-modal-note">「추천 값으로」는 한도를 넘길 때 배당 → 수익정산 → 급여 순으로 맞춘 숫자입니다. 한도 안이면 여유는 회사에 두라고 권합니다.</p>';
     html += '<p class="app-modal-note">하단은 해마다 금액·세금·세후 한 줄입니다. 급여·수익배분·배당을 누르면 소득세와 주민세가 펼쳐집니다. 세금은 마이너스입니다. 두 해이면 오른쪽 전체 합계는 해마다 세후를 더한 값입니다. 반영안함 배당은 합계에 넣지 않습니다. 배당 상한만 법인세 추정치를 씁니다.</p>';
     html += "</section>";
     html += '<section class="app-modal-section"><h4>현금</h4>';
@@ -5005,7 +5004,6 @@
       html += '<div class="payout-fit-split-row is-total payout-fit-tax-grand">';
       html += '<div class="payout-fit-row-label">전체 합계</div>';
       html += '<div class="payout-fit-year-cell payout-fit-tax-grand-cell">';
-      html += '<div class="payout-fit-tax-one payout-fit-tax-one-head"><span>금액</span><span>세금</span><span>세후</span></div>';
       html += payoutFitTaxOneLine(grand);
       html += "</div></div>";
     }
