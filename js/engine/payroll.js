@@ -9,6 +9,19 @@
     return App.Month.appliesInMonth(emp, month, simStart, simEnd);
   }
 
+  function employeeMonthSalary(emp, month) {
+    var byYear = emp && emp.monthlySalaryByYear;
+    if (byYear && typeof byYear === "object") {
+      var y = App.TaxYear && App.TaxYear.yearOf
+        ? App.TaxYear.yearOf(month)
+        : Number(String(month || "").slice(0, 4));
+      var v = byYear[y];
+      if (v == null) v = byYear[String(y)];
+      if (v != null && v !== "") return App.Money.roundWon(v);
+    }
+    return App.Money.roundWon(emp && emp.monthlySalary);
+  }
+
   function employeeIncentiveAmount(emp, m) {
     var parsed = App.Month.parseMonth(m);
     if (!parsed) return 0;
@@ -37,7 +50,7 @@
       var total = 0;
       (employees || []).forEach(function (emp) {
         if (!employed(emp, m, rangeEnd, rangeStart)) return;
-        var salaryAmount = App.Money.roundWon(emp.monthlySalary);
+        var salaryAmount = employeeMonthSalary(emp, m);
         var incentiveAmount = employeeIncentiveAmount(emp, m);
         var amount = App.Money.roundWon(salaryAmount + incentiveAmount);
         if (!amount) return;
@@ -108,7 +121,7 @@
     var base = 0;
     (employees || []).forEach(function (emp) {
       if (!employed(emp, m, months[months.length - 1], months[0]) || !emp.severance) return;
-      base += App.Money.roundWon(emp.monthlySalary);
+      base += employeeMonthSalary(emp, m);
     });
     return base;
   }

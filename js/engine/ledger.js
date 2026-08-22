@@ -231,35 +231,6 @@
         ], months, "funding"), "현금성/자산 이동")
       : null;
 
-    var profitShareValues = emptyValues(months);
-    var profitShareWorkValues = emptyValues(months);
-    var profitShareSalesValues = emptyValues(months);
-    (flows || []).forEach(function (row) {
-      addAmount(profitShareValues, row.month, -App.Money.roundWon(row.profitShare));
-    });
-    if (App.Defaults.resolveOwnerProfitShare) {
-      var share = App.Defaults.resolveOwnerProfitShare(state, months);
-      (share.workPayments || []).forEach(function (p) {
-        if (p.month) addAmount(profitShareWorkValues, p.month, -App.Money.roundWon(p.amount));
-      });
-      (share.salesPayments || []).forEach(function (p) {
-        if (p.month) addAmount(profitShareSalesValues, p.month, -App.Money.roundWon(p.amount));
-      });
-    }
-    var profitShareRows = [];
-    if (sumValues(profitShareWorkValues)) {
-      profitShareRows.push(finishRow("owner-profit-work", "작품 수익배분", profitShareWorkValues, "funding"));
-    }
-    if (sumValues(profitShareSalesValues)) {
-      profitShareRows.push(finishRow("owner-profit-sales", "영업 수익배분", profitShareSalesValues, "funding"));
-    }
-    if (!profitShareRows.length && sumValues(profitShareValues)) {
-      profitShareRows.push(finishRow("owner-profit-share", "수익배분", profitShareValues, "funding"));
-    }
-    var profitShareGroup = profitShareRows.length
-      ? withSection(makeGroup("profit-share", "수익배분", profitShareRows, months, "funding"), "현금성/자산 이동")
-      : null;
-
     var otherInRows = collectFromByMonth((parts.otherInflows || {}).byMonth, months, function (it) {
       return "oin-" + (it.id || it.name);
     }, function (it) { return it.name || "기타 입금"; }, 1);
@@ -307,6 +278,31 @@
     var projectGroup = withSection(makeGroup("project", "프로젝트 직접비", projectRows, months), "매출원가");
     groups.push(projectGroup);
 
+    var settleMap = {};
+    var settleOrder = [];
+    (months || []).forEach(function (m) {
+      ((((parts.profitSettle || {}).byMonth || {})[m] || {}).items || []).forEach(function (it) {
+        var key = "settle-" + (it.projectId || it.id || it.name);
+        if (!settleMap[key]) {
+          var rateText = it.rate ? " · " + pctLabel(it.rate) : "";
+          settleMap[key] = {
+            id: key,
+            label: "[자동] " + (it.name || "프로젝트") + " 수익정산" + rateText,
+            values: emptyValues(months)
+          };
+          settleOrder.push(key);
+        }
+        addAmount(settleMap[key].values, m, -App.Money.roundWon(it.amount));
+      });
+    });
+    var settleRows = settleOrder.map(function (k) {
+      return finishRow(settleMap[k].id, settleMap[k].label, settleMap[k].values);
+    }).filter(function (row) { return row.total; });
+    var profitSettleGroup = settleRows.length
+      ? withSection(makeGroup("profit-settle", "수익정산", settleRows, months), "매출원가")
+      : null;
+    if (profitSettleGroup) groups.push(profitSettleGroup);
+
     var agencyRows = [];
     (months || []).forEach(function (m) {
       ((((parts.fees || {}).byMonth || {})[m] || {}).items || []).forEach(function (it, idx) {
@@ -330,6 +326,7 @@
 
     var cogsValues = emptyValues(months);
     addGroupInto(cogsValues, projectGroup, months);
+    addGroupInto(cogsValues, profitSettleGroup, months);
     addGroupInto(cogsValues, agencyGroup, months);
     groups.push(withSection(makeSummaryGroup("cogs-total", "매출원가 합계", cogsValues, "expense-summary"), "매출원가"));
 
@@ -460,7 +457,6 @@
 
     if (fundingGroup) groups.push(fundingGroup);
     if (dividendGroup) groups.push(dividendGroup);
-    if (profitShareGroup) groups.push(profitShareGroup);
     if (otherInGroup) groups.push(otherInGroup);
 
     var incomeValues = emptyValues(months);

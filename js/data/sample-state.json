@@ -1,7 +1,7 @@
 {
   "version": 1,
   "profile": {
-    "actorName": "이종원",
+    "actorName": "배우",
     "companyName": "",
     "startMonth": "2026-10",
     "endMonth": "2027-12",
@@ -759,7 +759,7 @@
       "id": "21efb855-f92f-4b42-8c33-c07031603f27",
       "name": "배우",
       "role": "대표이사",
-      "monthlySalary": 20000000,
+      "monthlySalary": 5000000,
       "startMonth": null,
       "endMonth": null,
       "insure": true,
@@ -1282,8 +1282,9 @@
           "dividendRate": 0.1,
           "dividendOn": false,
           "dividendMonth": null,
-          "profitShareWorkRate": 0,
-          "profitShareSalesRate": 0
+          "profitShareWorkRate": 0.3,
+          "profitShareSalesRate": 0.3,
+          "profitShareExpenseRateOverride": 0.059
         },
         "personalTax": {
           "mode": "auto",
@@ -1385,10 +1386,10 @@
     "label": "최종 시드",
     "actorId": "802e40fd-d2e2-402a-baac-263aa41e04d9",
     "budgetId": "ee8811c2-2cf8-4db2-89b8-01983d2f0a2e",
-    "title": "이종원",
+    "title": "배우",
     "storageMode": "local",
     "createdAt": "2026-08-20T10:17:17.052Z",
-    "updatedAt": "2026-08-21T17:14:17.772Z"
+    "updatedAt": "2026-08-22T15:52:01.198Z"
   },
   "salesPlans": [
     {

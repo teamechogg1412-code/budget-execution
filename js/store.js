@@ -52,7 +52,9 @@
       companyName: p.companyName || "",
       startMonth: p.startMonth || "",
       endMonth: p.endMonth || "",
-      title: meta.title || p.companyName || p.actorName || "1인 기획사 예산안"
+      title: (App.Defaults && App.Defaults.budgetDisplayTitle)
+        ? App.Defaults.budgetDisplayTitle(state)
+        : (meta.title || p.companyName || "배우")
     };
   }
 
@@ -140,7 +142,7 @@
       var entry = (index.items || []).filter(function (it) { return it.id === id; })[0];
       var fresh = indexEntryFromState(id, state);
       if (entry) {
-        entry.name = entry.name || fresh.name;
+        if (!entry.name || entry.name === "이종원") entry.name = fresh.name;
         entry.actorName = fresh.actorName;
         entry.companyName = fresh.companyName;
         entry.startMonth = fresh.startMonth;
@@ -265,7 +267,7 @@
   }
 
   function download(state) {
-    var name = (state.profile.companyName || state.profile.actorName || "1인기획사")
+    var name = (state.profile.companyName || ((App.Defaults && App.Defaults.actorDisplayName) ? App.Defaults.actorDisplayName() : "배우"))
       .replace(/[\\/:*?"<>|]/g, "") + "_예산안_" + (state.profile.startMonth || "") + ".json";
     var blob = new Blob([exportJson(state)], { type: "application/json" });
     var url = URL.createObjectURL(blob);

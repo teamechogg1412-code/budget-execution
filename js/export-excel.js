@@ -68,7 +68,7 @@
     var otherProjectDirect = n((k.projectDirect || 0) - (k.projectExpense || 0) - (k.lunchTruck || 0));
     var rows = [
       [h("항목"), h("금액(원)"), h("설명")],
-      [s("배우/회사"), s(p.actorName || p.companyName || ""), s("")],
+      [s("배우/회사"), s(p.companyName || ((App.Defaults && App.Defaults.actorDisplayName) ? App.Defaults.actorDisplayName() : "배우")), s("")],
       [s("시뮬 시작월"), s(p.startMonth || ""), s("")],
       [s("시뮬 종료월"), s(p.endMonth || ""), s("")],
       [s("최초 보유현금"), won(k.initialCash), s("시작월 기초")],
@@ -80,6 +80,7 @@
       [s("프로젝트 진행비"), won(k.projectExpense), s("월별 반영분. 밥차·설립비용은 여기 없음")],
       [s("밥차"), won(k.lunchTruck), s("진행비와 별도. 손익비용에 따로 더함")],
       [s("에이전시 수수료"), won(k.agencyFees), s("손익비용에 포함")],
+      [s("수익정산"), won(k.profitShare), s("작품·영업 매출 × 수익배분율. 매출원가")],
       [s("설립비용"), won(k.startup), s("비용 탭 초기비용. 월별비용 설립비용과 같음. 손익비용에 포함")],
       [s("기타 프로젝트 직접비"), won(otherProjectDirect), s("진행비·밥차 제외. 수동 직접비+프로젝트분류 수수료")],
       [s("손익비용 합계"), won(k.pnlExpense), s("월별현금 손익비용 합계와 같아야 함")],
@@ -103,7 +104,7 @@
       [s("광고·시딩·행사·화보·앰버서더 기본 진행비는 계약금 %가 아니라 헤어·메이크업·스타일링 + 당일 식대 × 배율입니다.")],
       [s("촬영월이 없는 작품은 진행비가 등록만 되고 월별 현금에는 안 들어갑니다. 경고 시트를 보세요.")],
       [s("원장 비용은 화면과 같이 음수(지출)입니다. 월별비용 시트는 양수(나간 돈)입니다.")],
-      [s("손익비용 = 인건비 + 운영비 + 진행비 + 밥차 + 에이전시 수수료 + 설립비용 + 기타 프로젝트 직접비입니다. 밥차와 설립비용은 진행비에 들어 있지 않습니다.")],
+      [s("손익비용 = 인건비 + 운영비 + 진행비 + 밥차 + 에이전시 수수료 + 수익정산 + 설립비용 + 기타 프로젝트 직접비입니다. 밥차와 설립비용은 진행비에 들어 있지 않습니다.")],
       [s("추정 법인세는 영업이익에 대한 참고 계산이며 손익비용에 넣지 않습니다.")]
     ].map(function (row) { return row; });
   }
@@ -425,7 +426,7 @@
 
   function fileName(state) {
     var p = (state && state.profile) || {};
-    var who = (p.companyName || p.actorName || "1인기획사").replace(/[\\/:*?"<>|]/g, "");
+    var who = (p.companyName || ((App.Defaults && App.Defaults.actorDisplayName) ? App.Defaults.actorDisplayName() : "배우")).replace(/[\\/:*?"<>|]/g, "");
     return who + "_검산_" + (p.startMonth || "") + "_" + (p.endMonth || "") + ".xls";
   }
 

@@ -114,7 +114,7 @@
       assert("대표 배당 연도표", htmlSimUi.indexOf("영업이익연동") >= 0 && htmlSimUi.indexOf("배당지급일") >= 0);
       assert("배당 비율 입력", htmlSimUi.indexOf('data-path="settings.scenarios.soloAgency.ownerPayout.dividendRate"') >= 0 &&
         htmlSimUi.indexOf("배당비율") >= 0);
-      eq("배당 기본은 영업이익 20%", App.Defaults.ensureScenarioSettings(empty()).settings.scenarios.soloAgency.ownerPayout.dividendRate, 0.2);
+      eq("배당 기본은 영업이익 10%", App.Defaults.ensureScenarioSettings(empty()).settings.scenarios.soloAgency.ownerPayout.dividendRate, 0.1);
       assert("배당 연도 자동", htmlSimUi.indexOf("<td>2027</td>") >= 0);
       assert("전속 배분율", htmlSimUi.indexOf("회사 배분율") >= 0 && htmlSimUi.indexOf("배우 배분율") >= 0);
       assert("배분 기준 토글", htmlSimUi.indexOf("총매출 기준") >= 0 && htmlSimUi.indexOf("비용 차감 후") >= 0);
@@ -126,12 +126,56 @@
       assert("기본 스타일링 항목", htmlSimUi.indexOf("스타일링") >= 0);
       assert("1회 단가 수정 필드", htmlSimUi.indexOf("1회 단가") >= 0 && htmlSimUi.indexOf("원 / 회") >= 0);
       assert("횟수 수정 필드", htmlSimUi.indexOf('data-path="settings.scenarios.exclusiveContract.actorPersonalCosts.0.quantity"') >= 0);
+      assert("비교 시나리오 카드 기본 접힘", htmlSimUi.indexOf('data-tax-fold="scenario-solo"') >= 0 &&
+        htmlSimUi.indexOf('data-tax-fold="scenario-solo" open') < 0 &&
+        htmlSimUi.indexOf('data-tax-fold="scenario-exclusive"') >= 0 &&
+        htmlSimUi.indexOf('data-tax-fold="scenario-exclusive" open') < 0);
+      var htmlSimUiOpen = App.Render.renderView("simulation", sUi, App.Engine.runSimulation(sUi), {
+        simTab: "tax", taxFoldOpen: { "scenario-solo": true }
+      });
+      assert("1인 기획사 지정 펼침", htmlSimUiOpen.indexOf('data-tax-fold="scenario-solo" open') >= 0 &&
+        htmlSimUiOpen.indexOf('data-tax-fold="scenario-exclusive" open') < 0);
       var htmlSimTabs = App.Render.renderView("simulation", sUi, App.Engine.runSimulation(sUi), {});
       assert("설정 2차 탭 기본", htmlSimTabs.indexOf("기본 설정") >= 0 && htmlSimTabs.indexOf("조직·인건비") >= 0);
       assert("설정 2차 탭 나머지", htmlSimTabs.indexOf("회사 지원") >= 0 && htmlSimTabs.indexOf("수수료·정책") >= 0 && htmlSimTabs.indexOf("세금·비교조건") >= 0);
       assert("설정에 회사 운영비 탭 없음", htmlSimTabs.indexOf("회사 운영비") < 0);
       assert("기본 탭에 비교 본문 없음", htmlSimTabs.indexOf("비교 시나리오") < 0);
       assert("기본 탭 3열 정보", htmlSimTabs.indexOf("기본정보") >= 0 && htmlSimTabs.indexOf("시작월") >= 0 && htmlSimTabs.indexOf("최초 보유현금") >= 0);
+      assert("기본 탭에 배우명 입력 없음", htmlSimTabs.indexOf('data-path="profile.actorName"') < 0);
+      assert("기본 탭에 배우명 라벨 없음", htmlSimTabs.indexOf(">배우명<") < 0);
+      var htmlSimSettings = App.Render.renderView("simulation", sUi, App.Engine.runSimulation(sUi), { simTab: "settings" });
+      function settingsFoldOpenAttr(html, id) {
+        var needle = 'data-settings-fold="' + id + '"';
+        var idx = html.indexOf(needle);
+        if (idx < 0) return null;
+        return html.slice(idx, idx + needle.length + 8).indexOf(" open") >= 0;
+      }
+      assert("설정 탭 접기 카드", htmlSimSettings.indexOf('data-settings-fold="insurance"') >= 0 &&
+        htmlSimSettings.indexOf('data-settings-fold="severance"') >= 0 &&
+        htmlSimSettings.indexOf('data-settings-fold="vat"') >= 0 &&
+        htmlSimSettings.indexOf('data-settings-fold="holidays"') >= 0 &&
+        htmlSimSettings.indexOf('data-settings-fold="workdays"') >= 0 &&
+        htmlSimSettings.indexOf('data-settings-fold="note"') >= 0);
+      assert("설정 카드 제목은 접혀도 보임", htmlSimSettings.indexOf("4대보험 요율") >= 0 &&
+        htmlSimSettings.indexOf("퇴직급여") >= 0 &&
+        htmlSimSettings.indexOf("부가가치세(VAT)") >= 0 &&
+        htmlSimSettings.indexOf("회사 휴무일") >= 0 &&
+        htmlSimSettings.indexOf("강제 근무일") >= 0);
+      assert("설정 카드 기본 접힘", settingsFoldOpenAttr(htmlSimSettings, "insurance") === false &&
+        settingsFoldOpenAttr(htmlSimSettings, "severance") === false &&
+        settingsFoldOpenAttr(htmlSimSettings, "vat") === false &&
+        settingsFoldOpenAttr(htmlSimSettings, "holidays") === false &&
+        settingsFoldOpenAttr(htmlSimSettings, "workdays") === false &&
+        settingsFoldOpenAttr(htmlSimSettings, "note") === false);
+      var htmlSimSettingsOpen = App.Render.renderView("simulation", sUi, App.Engine.runSimulation(sUi), {
+        simTab: "settings",
+        settingsFoldOpen: { insurance: true, vat: true }
+      });
+      assert("설정 카드 지정 펼침", settingsFoldOpenAttr(htmlSimSettingsOpen, "insurance") === true &&
+        settingsFoldOpenAttr(htmlSimSettingsOpen, "vat") === true &&
+        settingsFoldOpenAttr(htmlSimSettingsOpen, "severance") === false);
+      assert("휴무 추가는 접힌 헤더에 유지", htmlSimSettings.indexOf('data-action="add-holiday"') >= 0 &&
+        htmlSimSettings.indexOf('data-action="add-workday"') >= 0);
 
       var htmlAnalysisDefault = App.Render.renderView("analysis", sUi, App.Engine.runSimulation(sUi), {});
       var tabsHtml = htmlAnalysisDefault.slice(
@@ -142,14 +186,28 @@
         tabsHtml.indexOf("5배") >= 0);
       assert("분석 서브탭 매출하한", tabsHtml.indexOf("참고(매출하한)") >= 0);
       assert("배수 비교 탭 제거", tabsHtml.indexOf("배수 비교") < 0);
-      assert("접기 월별·현금·시나리오·한눈", htmlAnalysisDefault.indexOf('data-id="monthly"') >= 0 &&
+      assert("접기 월별·현금·시나리오·한눈·인출", htmlAnalysisDefault.indexOf('data-id="monthly"') >= 0 &&
         htmlAnalysisDefault.indexOf('data-id="cash"') >= 0 &&
         htmlAnalysisDefault.indexOf('data-id="scenarios"') >= 0 &&
-        htmlAnalysisDefault.indexOf('data-id="glance"') >= 0);
-      assert("분석 섹션 번호", htmlAnalysisDefault.indexOf("1. 월별 분석") >= 0 &&
-        htmlAnalysisDefault.indexOf("2. 기말 현금 맞춤") >= 0 &&
-        htmlAnalysisDefault.indexOf("3. 시나리오 비교") >= 0 &&
-        htmlAnalysisDefault.indexOf("4. 한눈에 비교") >= 0);
+        htmlAnalysisDefault.indexOf('data-id="glance"') >= 0 &&
+        htmlAnalysisDefault.indexOf('data-id="payout-fit"') >= 0);
+      function foldExpanded(html, id) {
+        var idx = html.indexOf('data-id="' + id + '"');
+        if (idx < 0) return null;
+        return html.slice(idx, idx + 60).indexOf('aria-expanded="true"') >= 0;
+      }
+      assert("분석 진입 시 월별 분석만 기본 펼침", foldExpanded(htmlAnalysisDefault, "monthly") === true &&
+        foldExpanded(htmlAnalysisDefault, "cash") === false &&
+        foldExpanded(htmlAnalysisDefault, "scenarios") === false &&
+        foldExpanded(htmlAnalysisDefault, "glance") === false &&
+        foldExpanded(htmlAnalysisDefault, "payout-fit") === false);
+      assert("분석 섹션 번호", htmlAnalysisDefault.indexOf("1. 대표 인출 적정성") >= 0 &&
+        htmlAnalysisDefault.indexOf("2. 월별 분석") >= 0 &&
+        htmlAnalysisDefault.indexOf("3. 기말 현금 맞춤") >= 0 &&
+        htmlAnalysisDefault.indexOf("4. 시나리오 비교") >= 0 &&
+        htmlAnalysisDefault.indexOf("5. 한눈에 비교") >= 0);
+      assert("대표 인출 적정성이 맨 앞",
+        htmlAnalysisDefault.indexOf('data-id="payout-fit"') < htmlAnalysisDefault.indexOf('data-id="monthly"'));
       assert("기말 현금은 월별과 시나리오 사이",
         htmlAnalysisDefault.indexOf('data-id="monthly"') < htmlAnalysisDefault.indexOf('data-id="cash"') &&
         htmlAnalysisDefault.indexOf('data-id="cash"') < htmlAnalysisDefault.indexOf('data-id="scenarios"'));
@@ -159,17 +217,25 @@
         htmlAnalysisDefault.indexOf("전체 펴기") >= 0);
       assert("분석 탭 순서", tabsHtml.indexOf("1배 · 지금") < tabsHtml.indexOf("5배") &&
         tabsHtml.indexOf("5배") < tabsHtml.indexOf("참고(매출하한)"));
-      assert("기본은 시나리오 비교", htmlAnalysisDefault.indexOf("월별 손익 · 현금흐름") < 0 &&
-        htmlAnalysisDefault.indexOf("1인 기획사 경제가치") >= 0);
+      assert("분석 상단 기본정보", htmlAnalysisDefault.indexOf("analysis-facts") >= 0);
+      assert("분석 상단 매출", htmlAnalysisDefault.indexOf(">매출</span>") >= 0);
+      assert("분석 상단 전속비율은 바로 수정 가능",
+        htmlAnalysisDefault.indexOf('data-path="settings.scenarios.exclusiveContract.companyShareRate"') >= 0 &&
+        htmlAnalysisDefault.indexOf('data-path="settings.scenarios.exclusiveContract.actorShareRate"') >= 0);
+      assert("분석 상단 기간", htmlAnalysisDefault.indexOf(">기간</span>") >= 0);
+      assert("분석 상단 1인−전속", htmlAnalysisDefault.indexOf(">1인 − 전속</span>") >= 0);
+      assert("기본은 월별 분석", htmlAnalysisDefault.indexOf("월별 손익 · 현금흐름") >= 0 &&
+        htmlAnalysisDefault.indexOf("회사 측 경제성") < 0);
       var htmlMonthly = App.Render.renderView("analysis", sUi, App.Engine.runSimulation(sUi), { analysisTab: "monthly" });
-      assert("월별 짧은 안내", htmlMonthly.indexOf("실제 입·출금 시점을 함께 보여줍니다") >= 0);
-      assert("월별 손익 순서 안내", htmlMonthly.indexOf("매출 → 매출원가 → 매출총이익 → 판관비 → 영업이익") >= 0);
+      assert("월별 안내는 본문에 중복 노출 안 함", htmlMonthly.indexOf("실제 입·출금 시점을 함께 보여줍니다") < 0 &&
+        htmlMonthly.indexOf("매출 → 매출원가 → 매출총이익 → 판관비 → 영업이익") < 0);
       assert("월별 긴 설명은 기본 숨김", htmlMonthly.indexOf("영업이익은 세전") < 0);
       assert("월별 도움말 버튼", htmlMonthly.indexOf("open-ledger-help") >= 0);
       assert("월별 도움말 모달 기본 닫힘", htmlMonthly.indexOf('id="ledger-help-title"') < 0);
       var htmlLedgerHelp = App.Render.renderView("analysis", sUi, App.Engine.runSimulation(sUi), { analysisTab: "monthly", ledgerHelpOpen: true });
       assert("월별 도움말 모달 열림", htmlLedgerHelp.indexOf('id="ledger-help-title"') >= 0);
       assert("도움말에 세전 영업이익", htmlLedgerHelp.indexOf("영업이익은 세전") >= 0);
+      assert("도움말에 손익 순서 안내", htmlLedgerHelp.indexOf("매출 → 매출원가 → 매출총이익 → 판관비 → 영업이익") >= 0);
       assert("도움말에 표 읽는 순서", htmlLedgerHelp.indexOf("손익 외 현금 이동") >= 0);
       assert("선택 월 상세 카드 없음", htmlMonthly.indexOf('id="month-detail"') < 0);
       assert("월별 탭에 식대 근거 반복 없음", htmlMonthly.indexOf("식대 계산 근거") < 0);
@@ -178,7 +244,7 @@
       assert("구형 세금 현금 납부월 제거", htmlMonthly.indexOf("세금 현금 납부월") < 0);
       assert("구형 Cash Flow 요약 제거", htmlMonthly.indexOf("Cash Flow 요약") < 0);
       assert("월별에 cashOutMonth 입력 없음", htmlMonthly.indexOf("settings.tax.cashOutMonth") < 0);
-      var htmlBoth = App.Render.renderView("analysis", sUi, App.Engine.runSimulation(sUi), { analysisTab: "scenarios" });
+      var htmlBoth = App.Render.renderView("analysis", sUi, App.Engine.runSimulation(sUi), { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("비교 탭에서 원장 숨김", htmlBoth.indexOf("월별 손익 · 현금흐름") < 0);
       assert("비교 탭 총매출", htmlBoth.indexOf("총매출") >= 0);
       assert("비교 탭 실수령", htmlBoth.indexOf("세후 개인 실수령") >= 0);
@@ -191,14 +257,45 @@
       assert("비교 탭에 상세 비교 없음", htmlBoth.indexOf("상세 비교 보기") < 0);
       var sNone = empty();
       sNone.settings.scenarioComparison.enabledScenarioIds = [];
-      var htmlNone = App.Render.renderView("analysis", sNone, App.Engine.runSimulation(sNone), { analysisTab: "scenarios" });
+      var htmlNone = App.Render.renderView("analysis", sNone, App.Engine.runSimulation(sNone), { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("0개 빈 상태", htmlNone.indexOf("비교할 시나리오를 시뮬레이션 설정에서 켜세요") >= 0);
       var sOne = empty();
       App.Defaults.setScenarioEnabled(sOne, "exclusiveContract", false);
-      var htmlOne = App.Render.renderView("analysis", sOne, App.Engine.runSimulation(sOne), { analysisTab: "scenarios" });
+      var htmlOne = App.Render.renderView("analysis", sOne, App.Engine.runSimulation(sOne), { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("1개 단일 요약 안내", htmlOne.indexOf("1인 기획사") >= 0 && htmlOne.indexOf("만 켜져 있습니다") >= 0);
       assert("1개도 요약 표", htmlOne.indexOf("세후 개인 실수령") >= 0);
     } catch (e) { fail("Scenario UI 예외", e.message || e); }
+
+    try {
+      var seedMult = App.Sample.load();
+      var rMult = App.Engine.runSimulation(seedMult);
+      var htmlMult = App.Render.renderView("analysis", seedMult, rMult, {});
+      assert("배수 비교 도움말 버튼", htmlMult.indexOf("open-multiplier-help") >= 0);
+      assert("배수 비교 설명은 기본 숨김", htmlMult.indexOf("무작위로 추가해 참고로 계산합니다") < 0);
+      var htmlMultHelp = App.Render.renderView("analysis", seedMult, rMult, { multiplierHelpOpen: true });
+      assert("배수 비교 도움말 모달", htmlMultHelp.indexOf('id="multiplier-help-title"') >= 0);
+      assert("도움말에 배수 설명", htmlMultHelp.indexOf("무작위로 추가해 참고로 계산합니다") >= 0);
+      assert("도움말에 수익 탭 미반영", htmlMultHelp.indexOf("실제 매출 계획(수익 탭)에는 반영되지 않습니다") >= 0);
+    } catch (e) { fail("배수 비교 도움말 예외", e.message || e); }
+
+    try {
+      var seedCmpHelp = App.Sample.load();
+      var rCmpHelp = App.Engine.runSimulation(seedCmpHelp);
+      var htmlCmp = App.Render.renderView("analysis", seedCmpHelp, rCmpHelp, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
+      assert("시나리오 비교 도움말 버튼", htmlCmp.indexOf("open-scenario-compare-help") >= 0);
+      assert("시나리오 비교 설명은 기본 숨김", htmlCmp.indexOf("법인 가치와 대표 개인 가치를 합한 결과") < 0);
+      var htmlCmpHelp = App.Render.renderView("analysis", seedCmpHelp, rCmpHelp, {
+        analysisTab: "scenarios", scenarioCompareHelpOpen: true,
+        analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false }
+      });
+      assert("시나리오 비교 도움말 모달", htmlCmpHelp.indexOf('id="scenario-compare-help-title"') >= 0);
+      assert("도움말에 시나리오 비교 설명", htmlCmpHelp.indexOf("법인 가치와 대표 개인 가치를 합한 결과") >= 0);
+      assert("도움말에 연도별 합산", htmlCmpHelp.indexOf("연도별 세후 결과는 합산") >= 0);
+      assert("도움말 중요 표기", htmlCmpHelp.indexOf(">중요<") >= 0);
+      assert("도움말에 비교 기준 총매출", htmlCmpHelp.indexOf("비교 기준 총매출") >= 0);
+      assert("도움말에 실수령 안내", htmlCmpHelp.indexOf("세후 개인 실수령은 종합소득세") >= 0);
+      assert("화면에서 비교 기준 안내 숨김", htmlCmp.indexOf("배우 입장에서 어느 구조가 경제적으로 유리한지만") < 0);
+    } catch (e) { fail("시나리오 비교 도움말 예외", e.message || e); }
 
     try {
       var sPol = empty();
@@ -307,12 +404,12 @@
       var seedPol = App.Sample.load();
       var seedEnd = App.Engine.runSimulation(seedPol).kpis.endClosing;
       eq("시드에 지원정책 주입", (seedPol.settings.supportPolicies || []).length, catalog.length);
-      eq("시드 기말 지원정책 불변", seedEnd, 963410430);
+      eq("시드 기말 지원정책 불변", seedEnd, 581708190);
       var rawOld = JSON.parse(App.Store.exportJson(App.Sample.load()));
       delete rawOld.settings.supportPolicies;
       var restoredPol = App.Store.parseImport(JSON.stringify(rawOld));
       assert("구 JSON에 카탈로그 주입", (restoredPol.settings.supportPolicies || []).length === catalog.length);
-      eq("구 JSON 기말 불변", App.Engine.runSimulation(restoredPol).kpis.endClosing, 1072910430);
+      eq("구 JSON 기말 불변", App.Engine.runSimulation(restoredPol).kpis.endClosing, 691208190);
 
       var htmlPol = App.Render.renderView("simulation", empty(), App.Engine.runSimulation(empty()), {
         simTab: "support",
@@ -368,12 +465,24 @@
       assert("스텝 차량 표시", htmlSeedSupport.indexOf("스텝 차량") >= 0);
       assert("차량보증금_ 필드명 제거", htmlSeedSupport.indexOf("차량보증금_") < 0);
       assert("차량 추가 버튼", htmlSeedSupport.indexOf("+ 차량 추가") >= 0);
+      assert("차량 추가는 섹션 헤더 오른쪽", htmlSeedSupport.indexOf("support-section-head") >= 0 &&
+        htmlSeedSupport.indexOf('data-action="add-vehicle"') >= 0);
       assert("차량명 입력폼", htmlSeedSupport.indexOf('data-path="vehicles.0.name"') >= 0);
       assert("보증금 입력폼", htmlSeedSupport.indexOf('data-path="vehicles.0.deposit"') >= 0);
       assert("렌트료 입력폼", htmlSeedSupport.indexOf('data-path="vehicles.0.monthlyRent"') >= 0);
       assert("보험료 입력폼", htmlSeedSupport.indexOf('data-path="vehicles.0.monthlyInsurance"') >= 0);
       var htmlOrgMeal = App.Render.renderView("simulation", empty(), App.Engine.runSimulation(empty()), { simTab: "org" });
       assert("직원 식대와 구분", htmlOrgMeal.indexOf("직원 식대") >= 0);
+      assert("조직 인건비·식대 접기", htmlOrgMeal.indexOf('data-settings-fold="org-payroll"') >= 0 &&
+        htmlOrgMeal.indexOf('data-settings-fold="org-meal"') >= 0);
+      assert("조직 인건비·식대 기본 접힘", htmlOrgMeal.indexOf('data-settings-fold="org-payroll" open') < 0 &&
+        htmlOrgMeal.indexOf('data-settings-fold="org-meal" open') < 0);
+      assert("접혀도 직원 추가 버튼 유지", htmlOrgMeal.indexOf('data-action="add-employee"') >= 0);
+      var htmlOrgMealOpen = App.Render.renderView("simulation", empty(), App.Engine.runSimulation(empty()), {
+        simTab: "org", settingsFoldOpen: { "org-meal": true }
+      });
+      assert("직원 식대 지정 펼침", htmlOrgMealOpen.indexOf('data-settings-fold="org-meal" open') >= 0);
+      assert("직원 식대 입력 한줄 4열", htmlOrgMeal.indexOf("sim-meal-fields") >= 0);
     } catch (e) { fail("지원정책 스키마 예외", e.message || e); }
 
     try {
@@ -567,7 +676,7 @@
       sCmp.settings.scenarios.exclusiveContract.costBurdenRules.projectDirect = "deductBeforeSplit";
       sCmp.settings.scenarios.exclusiveContract.costBurdenRules.revenueLinkedFees = "deductBeforeSplit";
 
-      var htmlCmp = App.Render.renderView("analysis", sCmp, soloFee, { analysisTab: "scenarios" });
+      var htmlCmp = App.Render.renderView("analysis", sCmp, soloFee, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("비교표 10억", htmlCmp.indexOf("1,000,000,000원") >= 0);
       assert("비교표 배분 전 공제", htmlCmp.indexOf("배분 전 공제") >= 0);
       assert("비교표 프로젝트 직접비", htmlCmp.indexOf("프로젝트 직접비") >= 0);
@@ -621,7 +730,7 @@
       var ppDiff = soloValueRate - exValueRate;
       var ppText = (ppDiff > 0 ? "+" : "") + App.Format.formatPct(ppDiff) + "p";
       assert("차이 경제가치율 %p", htmlCmp.indexOf(ppText) >= 0);
-      var htmlCmpCorpHelp = App.Render.renderView("analysis", sCmp, soloFee, { analysisTab: "scenarios", scenarioCorpHelpOpen: true });
+      var htmlCmpCorpHelp = App.Render.renderView("analysis", sCmp, soloFee, { analysisTab: "scenarios", scenarioCorpHelpOpen: true, analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("하단 구성 법인잔여", htmlCmp.indexOf("법인 세후 잔여") >= 0 &&
         htmlCmpCorpHelp.indexOf(App.Format.formatWon(cmpFee.scenarios.soloAgency.corporateEndingCash)) >= 0);
       assert("하단 구성 대표실수령", htmlCmp.indexOf("대표 개인 세후 실수령") >= 0 &&
@@ -877,7 +986,7 @@
       eq("T2b 2026 발생결손", y26n.nolIncurred, App.Money.roundWon(-y26n.preTaxProfit));
       eq("T2b 2027 사용액", y27n.nolUsed, y26n.nolIncurred);
       eq("T2b 2027 과세표준", y27n.taxableIncome, App.Money.roundWon(y27n.preTaxProfit - y27n.nolUsed));
-      var htmlTwoNol = App.Render.renderView("analysis", sTwo, rTwoNol, { analysisTab: "scenarios" });
+      var htmlTwoNol = App.Render.renderView("analysis", sTwo, rTwoNol, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("시나리오 비교에 이월결손금 공제", htmlTwoNol.indexOf("이월결손금 공제") >= 0);
       assert("시나리오 비교에 2027 공제액",
         htmlTwoNol.indexOf(App.Format.formatWon(-Math.abs(y27n.nolUsed))) >= 0);
@@ -991,7 +1100,7 @@
       eq("nextMarch 매출월은 세액 미차감", monthRow(rMar, "2026-12").taxCashOut, 0);
       eq("nextMarch 기말=미차감-세액", rMar.kpis.endClosing, rMarNone.kpis.endClosing - tax2026Mar);
       eq("nextMarch 1월은 미납부", monthRow(rMar, "2027-01").taxCashOut, 0);
-      var htmlMar = App.Render.renderView("analysis", sMar, rMar, { analysisTab: "monthly" });
+      var htmlMar = App.Render.renderView("analysis", sMar, rMar, { analysisTab: "monthly", ledgerOpen: { cashflow: true } });
       assert("nextMarch 법인세 및 주민세 납부 행", htmlMar.indexOf("법인세 및 주민세 납부") >= 0);
       assert("nextMarch 분리 납부행 없음", htmlMar.indexOf("법인지방소득세 납부") < 0);
       assert("nextMarch 현금증감 없음", htmlMar.indexOf("현금증감") < 0);
@@ -1021,7 +1130,7 @@
         App.Money.roundWon((cmpTwo.scenarios.exclusiveContract.personalTaxByYear[2026] || 0) +
           (cmpTwo.scenarios.exclusiveContract.personalTaxByYear[2027] || 0)));
 
-      var htmlTwoBoard = App.Render.renderView("analysis", sTwo, rTwo, { analysisTab: "scenarios" });
+      var htmlTwoBoard = App.Render.renderView("analysis", sTwo, rTwo, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("가로 비교 2026 열", htmlTwoBoard.indexOf("<h5>2026</h5>") >= 0);
       assert("가로 비교 2027 열", htmlTwoBoard.indexOf("<h5>2027</h5>") >= 0);
       assert("회사는 전체기간 1열", htmlTwoBoard.indexOf("<h5>전체기간</h5>") >= 0);
@@ -1047,8 +1156,8 @@
 
       var sample = App.Sample.load();
       var sampleRun = App.Engine.runSimulation(sample);
-      eq("샘플 기말현금 불변", sampleRun.kpis.endClosing, 963410430);
-      eq("샘플 최저잔액 불변", sampleRun.kpis.minClosing, 28075460);
+      eq("샘플 기말현금 불변", sampleRun.kpis.endClosing, 581708190);
+      eq("샘플 최저잔액 불변", sampleRun.kpis.minClosing, 34581828);
       eq("샘플 추가 필요자금 0", sampleRun.kpis.deficitCover, 0);
       var htmlSampleDash = App.Render.renderView("dashboard", sample, sampleRun);
       assert("샘플 대시보드에 권장 운전자금 없음", htmlSampleDash.indexOf("권장 운전자금") < 0);
@@ -1059,6 +1168,19 @@
         htmlSampleDash.indexOf("영업이익") >= 0 && htmlSampleDash.indexOf("세후이익") >= 0);
       assert("대시보드 1인 vs 전속 비교", htmlSampleDash.indexOf("1인 기획사 vs 기존 회사 전속") >= 0 &&
         htmlSampleDash.indexOf("1인 기획사 경제가치") >= 0 && htmlSampleDash.indexOf("기존 회사 전속 경제가치") >= 0);
+      assert("대시보드 배수 인덱스", htmlSampleDash.indexOf("dash-mult-tabs") >= 0 &&
+        htmlSampleDash.indexOf("1배수 · 지금") >= 0 &&
+        htmlSampleDash.indexOf("2배수") >= 0 &&
+        htmlSampleDash.indexOf("3배수") >= 0 &&
+        htmlSampleDash.indexOf("5배수") >= 0);
+      assert("대시보드 기본은 1배수", htmlSampleDash.indexOf("손익계산서 (1배수 · 지금)") >= 0 &&
+        htmlSampleDash.indexOf("손익계산서 (2배수)") < 0);
+      var htmlDash2x = App.Render.renderView("dashboard", sample, sampleRun, { multiplierSelected: 2 });
+      assert("대시보드 2배수 전환", htmlDash2x.indexOf("손익계산서 (2배수)") >= 0 &&
+        htmlDash2x.indexOf("손익계산서 (1배수 · 지금)") < 0);
+      assert("대시보드 배수 안내", htmlSampleDash.indexOf("위 인덱스로 1~5배수를 전환") >= 0);
+      eq("대시보드 배수 후 시드 기말 불변", App.Engine.runSimulation(sample).kpis.endClosing, 581708190);
+      eq("대시보드 배수 후 시드 최저 불변", App.Engine.runSimulation(sample).kpis.minClosing, 34581828);
       assert("대시보드에서 손익카드 제거", htmlSampleDash.indexOf("손익 · 현금 구분") < 0);
       var dashCmp = htmlSampleDash.slice(htmlSampleDash.indexOf("1인 기획사 vs 기존 회사 전속"));
       assert("비교 카드에 보증금 없음", dashCmp.indexOf("보증금") < 0);
@@ -1067,12 +1189,38 @@
       assert("대시보드 히어로 기간말 현금", htmlSampleDash.indexOf("기간말 현금") >= 0);
       assert("대시보드 히어로 최저 잔액", htmlSampleDash.indexOf("최저 잔액") >= 0);
       assert("대시보드 히어로 기간 입금", htmlSampleDash.indexOf("기간 입금") >= 0);
+      assert("대시보드에 배우 실명 없음", htmlSampleDash.indexOf("이종원") < 0);
       eq("헤더 미니 KPI는 대시보드 외 미렌더", App.Render.renderSticky(sampleRun), "");
       var htmlLoadGate = App.Render.renderView("dashboard", sample, sampleRun, { savedLoadOpen: true });
-      assert("첫 화면 불러오기 카드", htmlLoadGate.indexOf("저장된 값 불러오기") >= 0 &&
-        htmlLoadGate.indexOf('data-action="load-saved"') >= 0);
+      assert("첫 화면 비밀번호 카드", htmlLoadGate.indexOf("비밀번호를 입력하세요") >= 0 &&
+        htmlLoadGate.indexOf('data-action="unlock-app"') >= 0 &&
+        htmlLoadGate.indexOf('data-unlock-password') >= 0);
+      assert("첫 화면 제품명", htmlLoadGate.indexOf("1인 기획사 설립 운영 시뮬레이션") >= 0);
       assert("첫 화면에서는 대시보드 숫자 숨김", htmlLoadGate.indexOf("dash-hero") < 0);
-      assert("일반 대시보드는 불러오기 카드 없음", htmlSampleDash.indexOf('data-action="load-saved"') < 0);
+      var seedTitle = (sample.meta && (sample.meta.title || sample.meta.label)) ||
+        (sample.profile && sample.profile.actorName) || "";
+      assert("첫 화면에 시드 식별정보 없음", !seedTitle || htmlLoadGate.indexOf(seedTitle) < 0);
+      assert("첫 화면에 로컬 예산안 목록 없음", htmlLoadGate.indexOf("dash-load-local") < 0);
+      assert("첫 화면에 불러오기 우회 없음", htmlLoadGate.indexOf("load-saved") < 0 &&
+        htmlLoadGate.indexOf("dismiss-saved-load") < 0);
+      eq("비밀번호 1231 통과", App.Access.check("1231"), true);
+      eq("비밀번호 오입력 거부", App.Access.check("0000"), false);
+      var tgMsg = App.Telegram.accessMessage();
+      assert("접속 알림에 제품명", tgMsg.indexOf("1인 기획사 설립 운영 시뮬레이션") >= 0 && tgMsg.indexOf("접속 감지") >= 0);
+      assert("접속 알림에 시드 실명 없음", tgMsg.indexOf("이종원") < 0);
+      eq("시드 배우 표기", sample.profile.actorName, "배우");
+      eq("시드 예산안 제목", sample.meta.title, "배우");
+      assert("시드 JSON에 실명 없음", JSON.stringify(sample).indexOf("이종원") < 0);
+      var namedSeed = empty();
+      namedSeed.profile.actorName = "이종원";
+      namedSeed.meta.title = "이종원";
+      App.Defaults.ensureState(namedSeed);
+      eq("실명 배우명 익명화", namedSeed.profile.actorName, "배우");
+      eq("실명 제목 익명화", namedSeed.meta.title, "배우");
+      var htmlLockedAnalysis = App.Render.renderView("analysis", sample, sampleRun, { savedLoadOpen: true });
+      assert("잠금 중 분석 숨김", htmlLockedAnalysis.indexOf("dash-load-screen") >= 0 &&
+        htmlLockedAnalysis.indexOf("2. 월별 분석") < 0);
+      assert("일반 대시보드는 잠금 카드 없음", htmlSampleDash.indexOf('data-action="unlock-app"') < 0);
       ["simulation", "revenue", "costs", "analysis", "settings"].forEach(function (view) {
         var htmlOther = App.Render.renderView(view, sample, sampleRun, {
           costTab: "opex", analysisTab: "monthly", simTab: "org"
@@ -1589,7 +1737,7 @@
       seed.profile.baseRates.ad.count6 = 9;
       App.Defaults.fillSalesPlansToTargets(seed);
       eq("시드 계획 생성해도 확정매출 불변", App.Engine.runSimulation(seed).kpis.inflowInPeriod, seedIn);
-      eq("시드 기말 불변", App.Engine.runSimulation(seed).kpis.endClosing, 963410430);
+      eq("시드 기말 불변", App.Engine.runSimulation(seed).kpis.endClosing, 581708190);
 
       var sPay = empty();
       sPay.profile.startMonth = "2027-01";
@@ -1724,8 +1872,8 @@
       eq("원장 월말 TOTAL=세후월말", close.total, rL.kpis.endClosingAfterTax);
       eq("세후월말=기말-미납법인세주민세", rL.kpis.endClosingAfterTax,
         App.Money.roundWon(rL.kpis.endClosing - rL.kpis.corporateTaxPending - rL.kpis.localTaxPending));
-      eq("샘플 기말 현금", rL.kpis.endClosing, 963410430);
-      eq("샘플 최저 잔액", rL.kpis.minClosing, 28075460);
+      eq("샘플 기말 현금", rL.kpis.endClosing, 581708190);
+      eq("샘플 최저 잔액", rL.kpis.minClosing, 34581828);
 
       var revenueWork = ledgerGroup(rL, "revenue-work");
       var revenueSales = ledgerGroup(rL, "revenue-sales");
@@ -1745,8 +1893,10 @@
       var fundingGroupL = ledgerGroup(rL, "funding");
       var groupIdsL = (rL.ledger.groups || []).map(function (g) { return g.id; });
       assert("매출원가·매출총이익·영업이익 행", !!cogsGroup && !!grossGroup && !!opGroup);
-      eq("매출원가=직접비+수수료", cogsGroup.subtotal.total,
-        App.Money.roundWon(projectGroupL.subtotal.total + ((agencyGroupL && agencyGroupL.subtotal.total) || 0)));
+      eq("매출원가=직접비+수수료+수익정산", cogsGroup.subtotal.total,
+        App.Money.roundWon(projectGroupL.subtotal.total +
+          ((agencyGroupL && agencyGroupL.subtotal.total) || 0) +
+          ((ledgerGroup(rL, "profit-settle") && ledgerGroup(rL, "profit-settle").subtotal.total) || 0)));
       eq("매출총이익=총매출+매출원가", grossGroup.subtotal.total,
         App.Money.roundWon(revenueTotal.subtotal.total + cogsGroup.subtotal.total));
       eq("영업이익=매출총이익+판관비", opGroup.subtotal.total,
@@ -1822,8 +1972,8 @@
 
       var ceo = ledgerItem(ledgerGroup(rL, "payroll"), "대표자(배우)");
       assert("대표 급여 행", !!ceo);
-      eq("대표 26-11", ceo.values["2026-11"], -20000000);
-      eq("대표 26-12", ceo.values["2026-12"], -20000000);
+      eq("대표 26-11", ceo.values["2026-11"], -5000000);
+      eq("대표 26-12", ceo.values["2026-12"], -5000000);
       eq("인건비 행수", ledgerGroup(rL, "payroll").rows.length, 4);
       eq("대표 인센티브 합", ledgerItem(ledgerGroup(rL, "payroll"), "대표 인센티브").total, 0);
       eq("로드매니저 인센티브 행 0원", ledgerItem(ledgerGroup(rL, "payroll"), "로드매니저 인센티브").total, 0);
@@ -1858,8 +2008,8 @@
       assert("접대비 행", !!ent);
       eq("접대비 기본월", ent.values["2026-12"], -200000);
       eq("접대비 Override 27-06", ent.values["2027-06"], -1200000);
-      eq("비용UI 검증용 기말", rC.kpis.endClosing, 963410430);
-      eq("비용UI 검증용 최저", rC.kpis.minClosing, 28075460);
+      eq("비용UI 검증용 기말", rC.kpis.endClosing, 581708190);
+      eq("비용UI 검증용 최저", rC.kpis.minClosing, 34581828);
 
       var jsonC = App.Store.exportJson(seedC);
       assert("JSON에 accordion 상태 없음", jsonC.indexOf("costItemOpen") < 0 && jsonC.indexOf("costSecOpen") < 0);
@@ -2088,7 +2238,7 @@
       assert("구 JSON 매출연동수수료 기본값 복원", Array.isArray(restoredNoFees.revenueFees) &&
         restoredNoFees.revenueFees.length === 2 && restoredNoFees.revenueFees[0].name === "써니스" &&
         restoredNoFees.revenueFees[1].name === "메리디안");
-      eq("구 JSON 기말현금 = 기본값 적용 결과", App.Engine.runSimulation(restoredNoFees).kpis.endClosing, 752410430);
+      eq("구 JSON 기말현금 = 기본값 적용 결과", App.Engine.runSimulation(restoredNoFees).kpis.endClosing, 370708190);
       var parsedBlankFees = JSON.parse(App.Store.exportJson(App.Sample.load()));
       parsedBlankFees.revenueFees = [
         { id: "old1", name: "", basis: "totalRevenue", rate: 0, category: "sga", include: true },
@@ -2113,12 +2263,15 @@
       if (App.Render && App.Render.renderView) {
         var htmlFee = App.Render.renderView("simulation", sFee, rFee2, { simTab: "fees", rateOpen: {}, workOpen: {} });
         assert("매출 연동 수수료 섹션", htmlFee.indexOf("매출 연동 수수료") >= 0);
+        assert("수수료율 칸은 좁은 입력", htmlFee.indexOf("fee-table") >= 0 && htmlFee.indexOf("compact-pct") >= 0);
         assert("써니스 입력값 표시", htmlFee.indexOf("써니스") >= 0);
         assert("메리디안 입력값 표시", htmlFee.indexOf("메리디안") >= 0);
         assert("판관비 옵션", htmlFee.indexOf("판관비") >= 0);
         assert("에이전시 수수료 옵션", htmlFee.indexOf("에이전시 수수료") >= 0);
         assert("수수료 기준 선택 옵션", htmlFee.indexOf("작품 매출") >= 0 && htmlFee.indexOf("TVCF만") >= 0);
         assert("수수료 항목 추가 버튼", htmlFee.indexOf("+ 수수료 항목") >= 0);
+        assert("수수료 추가는 섹션 헤더 오른쪽", htmlFee.indexOf('section-title') >= 0 &&
+          htmlFee.indexOf('data-action="add-fee"') >= 0);
         var htmlOrg = App.Render.renderView("simulation", sFee, rFee2, { simTab: "org" });
         assert("조직 탭 인건비", htmlOrg.indexOf("인건비") >= 0 && htmlOrg.indexOf("직원 식대") >= 0);
         assert("조직 탭에는 판관비 없음(별도 탭으로 분리)", htmlOrg.indexOf("회사 운영비 (판관비)") < 0);
@@ -2296,7 +2449,7 @@
       eq("전속 진행비 표시 kind", cmpXp.scenarios.exclusiveContract.lines.projectExpense.kind, "money");
       eq("전속 진행비 표시 금액", cmpXp.scenarios.exclusiveContract.lines.projectExpense.value, 160000000);
       eq("전속 진행비 표시 배지", cmpXp.scenarios.exclusiveContract.lines.projectExpense.badge, "기존 회사 100% 부담");
-      var htmlXpCmp = App.Render.renderView("analysis", sXp, rXpFull, { analysisTab: "scenarios" });
+      var htmlXpCmp = App.Render.renderView("analysis", sXp, rXpFull, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("비교표 진행비 행", htmlXpCmp.indexOf("진행비") >= 0);
       assert("비교표 진행비 회사 100% 부담 배지", htmlXpCmp.indexOf("기존 회사 100% 부담") >= 0);
       eq("1인 기획사 프로젝트 직접비=진행비+밥차+기타", cmpXp.scenarios.soloAgency.projectDirectTotal,
@@ -2552,9 +2705,9 @@
       eq("구 JSON 무필드는 기본률 20%", App.Engine.calculateProjectExpenseDetail(sMig0.projects[0], sMig0).total, 40000000);
 
       var seedXp = (App.Defaults.seedState || App.Sample.load)();
-      eq("시드 기본률 적용 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 963410430);
+      eq("시드 기본률 적용 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 581708190);
       App.Defaults.ensureState(seedXp);
-      eq("시드 마이그레이션 후 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 963410430);
+      eq("시드 마이그레이션 후 기말", App.Engine.runSimulation(seedXp).kpis.endClosing, 581708190);
       assert("시드에 작품 있음", (seedXp.projects || []).length > 0);
       eq("시드 진행비 kpi", App.Engine.runSimulation(seedXp).kpis.projectExpense, 345102000);
 
@@ -2883,8 +3036,8 @@
 
       var seedP = App.Sample.load();
       var seedBefore = App.Engine.runSimulation(seedP);
-      eq("시드 회귀 기말", seedBefore.kpis.endClosing, 963410430);
-      eq("시드 회귀 최저", seedBefore.kpis.minClosing, 28075460);
+      eq("시드 회귀 기말", seedBefore.kpis.endClosing, 581708190);
+      eq("시드 회귀 최저", seedBefore.kpis.minClosing, 34581828);
       seedP.profile.endMonth = "2027-12";
       var seedExt = App.Engine.runSimulation(seedP);
       eq("시드 기존 운영비는 전체기간 유지", monthRow(seedExt, "2027-12").recurring, 8350000);
@@ -3313,7 +3466,7 @@
           (withVehicle.scenarios.exclusiveContract.uniqueBenefitValue || 0));
       eq("배우전용 차량 렌트는 배우 지원가치(분류)", withVehicle.scenarios.exclusiveContract.actorSupportValue, 2000000);
       eq("기존회사 회사지원가치 = 렌트료", withVehicle.scenarios.exclusiveContract.companySupportValue, 2000000);
-      var htmlVehCmp = App.Render.renderView("analysis", sExVal, withVehicleRun, { analysisTab: "scenarios" });
+      var htmlVehCmp = App.Render.renderView("analysis", sExVal, withVehicleRun, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("회사 패널에 차량 렌트", htmlVehCmp.indexOf("하이리무진") >= 0);
       assert("회사 패널에 남는 금액", htmlVehCmp.indexOf("회사 최종 잔여") >= 0);
       assert("분석에서 지원가치 상세 합계 없음", htmlVehCmp.indexOf("회사 지원가치 합계") < 0);
@@ -3358,12 +3511,16 @@
       eq("전속 경제가치=실수령(공통지원 제외)", exB.controlledEconomicValue,
         App.Money.roundWon(exB.actorNetIncome));
       eq("전속 고유혜택 없음", exB.uniqueBenefitValue, 0);
-      var htmlBen = App.Render.renderView("analysis", sBen, rBen, { analysisTab: "scenarios" });
+      var htmlBen = App.Render.renderView("analysis", sBen, rBen, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("산식 라벨 대표 신용카드 사용분", htmlBen.indexOf("대표 신용카드 사용분") >= 0);
       assert("산식 라벨 배우 지원가치 없음", htmlBen.indexOf("배우 지원가치") < 0);
-      assert("공통 지원 제외 안내", htmlBen.indexOf("양 시나리오에서 동일하게 발생하므로 경제가치 비교에서 제외") >= 0);
-      assert("공통 지원 금액 표시", htmlBen.indexOf(App.Format.formatWon(soloB.commonActorSupportValue)) >= 0);
-      eq("시드 기말 불변(경제가치 산식)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 963410430);
+      var htmlBenHelp = App.Render.renderView("analysis", sBen, rBen, {
+        analysisTab: "scenarios", scenarioCompareHelpOpen: true,
+        analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false }
+      });
+      assert("공통 지원 제외 안내", htmlBenHelp.indexOf("양 시나리오에서 동일하게 발생하므로 경제가치 비교에서 제외") >= 0);
+      assert("공통 지원 금액 표시", htmlBenHelp.indexOf(App.Format.formatWon(soloB.commonActorSupportValue)) >= 0);
+      eq("시드 기말 불변(경제가치 산식)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 581708190);
     } catch (e) { fail("배우 지원가치 동일기준 예외", e.message || e); }
 
     try {
@@ -3381,7 +3538,7 @@
         return !/차량보증금/.test(d.name || "");
       }));
       var seedVehRun = App.Engine.runSimulation(seedVeh);
-      eq("시드 차량 전환 후 기말 불변", seedVehRun.kpis.endClosing, 963410430);
+      eq("시드 차량 전환 후 기말 불변", seedVehRun.kpis.endClosing, 581708190);
       eq("시드 차량 전환 후 보증금 45M", seedVehRun.kpis.deposits, 45000000);
       assert("시드 차량 렌트는 판관비", seedVehRun.kpis.supportSga > 0);
       eq("원장 하이리무진 보증금은 계약 시작월(11월)", ledgerItem(ledgerGroup(seedVehRun, "funding"), "하이리무진 보증금").values["2026-11"], -30000000);
@@ -3636,7 +3793,7 @@
       });
       assert("커스텀 체크박스는 comparisonBurdenType이 custom일 때만", true);
 
-      var htmlCmpBur = App.Render.renderView("analysis", sBur, rBur, { analysisTab: "scenarios" });
+      var htmlCmpBur = App.Render.renderView("analysis", sBur, rBur, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("분석에서 인건비 상세 미표시", htmlCmpBur.indexOf("인건비 상세") < 0);
       var htmlOrgBur = App.Render.renderView("simulation", sBur, rBur, { simTab: "org" });
       assert("설정 조직에서 대표 이름", htmlOrgBur.indexOf("이종원") >= 0);
@@ -3733,7 +3890,7 @@
       eq("연도별 본부장 합=전체", App.Money.sumBy(exMix.taxYears, function (s) { return s.directorCost; }),
         exMix.directorCost);
 
-      var htmlMix = App.Render.renderView("analysis", sMix, rMix, { analysisTab: "scenarios" });
+      var htmlMix = App.Render.renderView("analysis", sMix, rMix, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("회사 측 경제성 패널", htmlMix.indexOf("회사 측 경제성") >= 0);
       assert("회사에 남는 금액 라벨", htmlMix.indexOf("회사 최종 잔여") >= 0);
       assert("회사에 남는 금액 숫자", htmlMix.indexOf(App.Format.formatWon(mixCompanyRemain)) >= 0);
@@ -3756,7 +3913,7 @@
       var rChain0 = App.Engine.runSimulation(sChain);
       var cChain0 = App.Engine.runScenarioComparison(sChain, rChain0);
       var eco0 = App.Render.exclusiveCompanyEconomics(cChain0.scenarios.exclusiveContract);
-      var htmlChain0 = App.Render.renderView("analysis", sChain, rChain0, { analysisTab: "scenarios" });
+      var htmlChain0 = App.Render.renderView("analysis", sChain, rChain0, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("연쇄 전 합계 라벨", htmlChain0.indexOf("비용 합계") >= 0);
       assert("연쇄 전 합계 숫자", htmlChain0.indexOf(App.Format.formatWon(-eco0.companyCostTotal)) >= 0);
       assert("연쇄 전 잔여 숫자", htmlChain0.indexOf(App.Format.formatWon(eco0.economicRemaining)) >= 0);
@@ -3808,7 +3965,7 @@
           Math.abs(cChain1.scenarios.exclusiveContract.controlledEconomicValue)
         : null;
       assert("차이율 재계산", rate1 !== rate0);
-      var htmlChain1 = App.Render.renderView("analysis", sChain, rChain1, { analysisTab: "scenarios" });
+      var htmlChain1 = App.Render.renderView("analysis", sChain, rChain1, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("연쇄 후 합계 숫자", htmlChain1.indexOf(App.Format.formatWon(-eco1.companyCostTotal)) >= 0);
       assert("연쇄 후 잔여 숫자", htmlChain1.indexOf(App.Format.formatWon(eco1.economicRemaining)) >= 0);
       var remainRate1 = cChain1.scenarios.exclusiveContract.totalRevenue
@@ -4050,7 +4207,7 @@
       var restoredLt = App.Store.parseImport(App.Store.exportJson(sOtt));
       eq("JSON 왕복 후 연동 유지", App.Engine.runSimulation(restoredLt).kpis.lunchTruck, 2000000);
 
-      var htmlCmpLt = App.Render.renderView("analysis", sLt, rLt, { analysisTab: "scenarios" });
+      var htmlCmpLt = App.Render.renderView("analysis", sLt, rLt, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("비교표 밥차비 하위행", htmlCmpLt.indexOf("밥차비") >= 0);
       assert("비교표 밥차 금액 표시", htmlCmpLt.indexOf("5,000,000원") >= 0);
       assert("비교표 직접비에 밥차 안내", htmlCmpLt.indexOf("프로젝트 직접비") >= 0);
@@ -4273,13 +4430,12 @@
       assert("자동 모드에서 종합소득세 0원 아님", ex1.incomeTax > 0);
 
       var htmlTaxTab = App.Render.renderView("simulation", sTaxLink, rTaxLink, { simTab: "tax" });
-      assert("세금 탭에 배우 귀속소득 요약", htmlTaxTab.indexOf("배우 귀속소득") >= 0);
-      assert("세금 탭에 과세표준 요약", htmlTaxTab.indexOf("과세표준") >= 0);
-      assert("세금 탭에 세후 배우 실수령 요약", htmlTaxTab.indexOf("세후 배우 실수령") >= 0);
-      assert("세금 탭 귀속소득 금액 표시", htmlTaxTab.indexOf(App.Format.formatWon(ex1.actorGrossIncome)) >= 0);
-      assert("세금 탭 세후실수령 금액이 시나리오 비교와 동일", htmlTaxTab.indexOf(App.Format.formatWon(ex1.actorNetIncome)) >= 0);
+      assert("세금 탭에 개인세금 입력 유지", htmlTaxTab.indexOf("개인세금 방식") >= 0);
+      assert("세금 탭에서 개인세금 요약 블록 제거", htmlTaxTab.indexOf("세후 배우 실수령") < 0 &&
+        htmlTaxTab.indexOf("필요경비/공제") < 0 &&
+        htmlTaxTab.indexOf("총 개인세금") < 0);
 
-      var htmlAnalysisCmp = App.Render.renderView("analysis", sTaxLink, rTaxLink, { analysisTab: "scenarios" });
+      var htmlAnalysisCmp = App.Render.renderView("analysis", sTaxLink, rTaxLink, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("분석 탭 시나리오비교에도 같은 세후실수령", htmlAnalysisCmp.indexOf(App.Format.formatWon(ex1.actorNetIncome)) >= 0);
 
       sTaxLink.settings.scenarios.exclusiveContract.actorShareRate = 0.5;
@@ -4456,7 +4612,7 @@
       }));
       var htmlAdRev = App.Render.renderView("revenue", sAdGap, rAdGap, {});
       assert("광고A 지급열 1.8억 부족", htmlAdRev.indexOf("180,000,000원") >= 0);
-      var htmlAdAn = App.Render.renderView("analysis", sAdGap, rAdGap, { analysisTab: "monthly" });
+      var htmlAdAn = App.Render.renderView("analysis", sAdGap, rAdGap, { analysisTab: "monthly", ledgerOpen: { "revenue-work": true, "revenue-sales": true } });
       assert("월별 검산 배너", htmlAdAn.indexOf("등록 계약금액") >= 0);
       assert("월별 TOTAL 부족 메모", htmlAdAn.indexOf("지급 부족") >= 0);
 
@@ -4483,7 +4639,7 @@
       var htmlEmptyPay = App.Render.renderView("revenue", sZeroPay, rZeroPay, { workItemOpen: {} });
       assert("지급 미설정 안내", htmlEmptyPay.indexOf("지급일정이 없으면") >= 0);
 
-      eq("시드 기말 현금 불변", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 963410430);
+      eq("시드 기말 현금 불변", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 581708190);
       eq("시드 검산 차이 0", App.Engine.runSimulation(App.Sample.load()).revenueGap.gap, 0);
     } catch (e) { fail("지급일정-월별분석 연동 예외", e.message || e); }
 
@@ -4601,7 +4757,7 @@
       var beforeSga = App.Engine.runSimulation(seedSga);
       App.Defaults.ensureState(seedSga);
       var afterSga = App.Engine.runSimulation(seedSga);
-      eq("판관비 재분류 후 기말 불변", afterSga.kpis.endClosing, 963410430);
+      eq("판관비 재분류 후 기말 불변", afterSga.kpis.endClosing, 581708190);
       eq("판관비 재분류 후 운영비 KPI 불변", afterSga.kpis.opex, beforeSga.kpis.opex);
       eq("판관비 재분류 후 손익비용 불변", afterSga.kpis.pnlExpense, beforeSga.kpis.pnlExpense);
       assert("인건비 family=sga", (seedSga.employees || []).every(function (e) { return e.family === "sga"; }));
@@ -4612,7 +4768,7 @@
 
       var jsonSga = App.Store.exportJson(seedSga);
       var restoredSga = App.Store.parseImport(jsonSga);
-      eq("JSON 왕복 기말 불변", App.Engine.runSimulation(restoredSga).kpis.endClosing, 963410430);
+      eq("JSON 왕복 기말 불변", App.Engine.runSimulation(restoredSga).kpis.endClosing, 581708190);
       assert("JSON 왕복 family 유지", restoredSga.employees[0].family === "sga");
 
       var payGroup = ledgerGroup(afterSga, "payroll");
@@ -4670,7 +4826,11 @@
       assert("시작월 초기비용 발생", monthRow(rFold, startMonth).startupCost > 0);
       eq("시작월 다음달 초기비용 0", monthRow(rFold, nextMonth).startupCost, 0);
       assert("시작월 보증금 발생", monthRow(rFold, startMonth).deposits > 0);
-      var htmlFold = App.Render.renderView("analysis", seedFold, rFold, { analysisTab: "monthly" });
+      var htmlFoldClosed = App.Render.renderView("analysis", seedFold, rFold, { analysisTab: "monthly" });
+      assert("현금흐름 기본 접힘", htmlFoldClosed.indexOf('data-group="cashflow"') >= 0 &&
+        htmlFoldClosed.indexOf("자산·보증금 이동") < 0 && htmlFoldClosed.indexOf("법인세 및 주민세 납부") < 0);
+      assert("현금흐름 접혀도 월말 자금은 보임", htmlFoldClosed.indexOf("월말 자금") >= 0);
+      var htmlFold = App.Render.renderView("analysis", seedFold, rFold, { analysisTab: "monthly", ledgerOpen: { cashflow: true } });
       assert("초기비용 소계 접기", htmlFold.indexOf('data-action="toggle-ledger-group"') >= 0 &&
         htmlFold.indexOf('data-group="startup"') >= 0);
       assert("보증금 소계 접기", htmlFold.indexOf('data-group="funding"') >= 0);
@@ -4703,7 +4863,7 @@
       });
       var htmlFoldOpen = App.Render.renderView("analysis", seedFold, rFold, {
         analysisTab: "monthly",
-        ledgerOpen: { startup: true, funding: true }
+        ledgerOpen: { startup: true, funding: true, cashflow: true }
       });
       assert("펼치면 초기비용 세목", htmlFoldOpen.indexOf('sticky-n">등록면허세') >= 0);
       assert("펼치면 보증금 세목", htmlFoldOpen.indexOf('sticky-n">사무실보증금') >= 0);
@@ -4859,8 +5019,8 @@
       eq("직접지정 차량렌트 10월 0", monthRow(rVehCustom, "2026-10").support, 0);
       eq("직접지정 차량렌트 11월", monthRow(rVehCustom, "2026-11").support, 800000);
 
-      eq("시드 기말 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 963410430);
-      eq("시드 최저 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.minClosing, 28075460);
+      eq("시드 기말 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 581708190);
+      eq("시드 최저 불변(운영비 기간)", App.Engine.runSimulation(App.Sample.load()).kpis.minClosing, 34581828);
     } catch (e) { fail("운영비 시뮬레이션 기간 연동 예외", e.message || e); }
 
     try {
@@ -5056,14 +5216,14 @@
         htmlIncOrg.indexOf("상위구분") >= 0 && htmlIncOrg.indexOf("계정과목") >= 0);
       assert("펼칠 수 있는 인건비 행에 클릭 표시", htmlIncOrg.indexOf('<i class="chev" aria-hidden="true"></i>') >= 0);
 
-      var htmlIncLedger = App.Render.renderView("analysis", sInc, rInc, { analysisTab: "monthly" });
+      var htmlIncLedger = App.Render.renderView("analysis", sInc, rInc, { analysisTab: "monthly", ledgerOpen: { payroll: true } });
       assert("분석표에 인센티브 행", htmlIncLedger.indexOf("본부장 인센티브") >= 0);
 
       sInc.employees[0].include = false;
       var rIncOff = App.Engine.runSimulation(sInc);
       eq("미포함 직원 인센티브도 제외", monthRow(rIncOff, "2027-12").payroll, 0);
 
-      assert("조직·인건비 직원 행은 기본 펼침(0으로도 확인 가능)", htmlIncOrg.indexOf('<details class="cost-item" data-cost-item="employees:inc1" open>') >= 0);
+      assert("조직·인건비 직원 행도 기본 접힘", htmlIncOrg.indexOf('<details class="cost-item" data-cost-item="employees:inc1" open>') < 0);
       var htmlIncCostLinked = App.Render.renderView("costs", sInc, App.Engine.runSimulation(sInc), { costTab: "opex", costSecOpen: { payroll: true }, costItemOpen: {} });
       assert("비용탭(연동) 인건비 행은 기본 접힘 유지", htmlIncCostLinked.indexOf('<details class="cost-item" data-cost-item="employees:inc1" open>') < 0);
     } catch (e) { fail("인건비 인센티브 예외", e.message || e); }
@@ -5087,7 +5247,7 @@
         });
         assert(label + " 0원도 셀 표시", row.showZero === true);
       });
-      var htmlZeroInc = App.Render.renderView("analysis", sZeroInc, rZero0, { analysisTab: "monthly" });
+      var htmlZeroInc = App.Render.renderView("analysis", sZeroInc, rZero0, { analysisTab: "monthly", ledgerOpen: { payroll: true } });
       assert("분석표 대표 인센티브", htmlZeroInc.indexOf("대표 인센티브") >= 0);
       assert("분석표 로드매니저 인센티브", htmlZeroInc.indexOf("로드매니저 인센티브") >= 0);
 
@@ -5139,7 +5299,7 @@
       eq("대표 인센티브가 시나리오에 별도로 집계", cmpOwnerInc.scenarios.soloAgency.ownerIncentiveAmount, 2000000);
       eq("대표 급여 총액에는 인센티브가 이미 포함", cmpOwnerInc.scenarios.soloAgency.earnedGross, 12000000);
 
-      var htmlOwnerCmp = App.Render.renderView("analysis", sOwnerInc, rOwnerInc, { analysisTab: "scenarios" });
+      var htmlOwnerCmp = App.Render.renderView("analysis", sOwnerInc, rOwnerInc, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("시나리오 비교표에 대표 인센티브 행", htmlOwnerCmp.indexOf("대표 인센티브") >= 0 &&
         htmlOwnerCmp.indexOf("2,000,000원") >= 0);
     } catch (e) { fail("대표 인센티브 별도 반영 예외", e.message || e); }
@@ -5196,10 +5356,10 @@
 
       var htmlDivSet = App.Render.renderView("simulation", sDiv, rDiv, { simTab: "tax" });
       assert("설정에 배당 금액 유지", htmlDivSet.indexOf("10,000,000") >= 0);
-      var htmlDivCmp = App.Render.renderView("analysis", sDiv, rDiv, { analysisTab: "scenarios" });
+      var htmlDivCmp = App.Render.renderView("analysis", sDiv, rDiv, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("시나리오에 대표 배당 행", htmlDivCmp.indexOf("대표 배당") >= 0);
       assert("시나리오에 배당소득세", htmlDivCmp.indexOf("배당소득세") >= 0);
-      var htmlDivLed = App.Render.renderView("analysis", sDiv, rDiv, { analysisTab: "monthly" });
+      var htmlDivLed = App.Render.renderView("analysis", sDiv, rDiv, { analysisTab: "monthly", ledgerOpen: { cashflow: true } });
       assert("월별 분석에 대표 배당", htmlDivLed.indexOf("대표 배당") >= 0);
       assert("배당은 손익 소계로 중복 표시 안 함", htmlDivLed.indexOf("배당 소계") < 0);
 
@@ -5222,12 +5382,12 @@
       assert("영업이익 비율로 배당액 표시", htmlDivRate.indexOf("영업이익연동") >= 0 &&
         htmlDivRate.indexOf(App.Format.formatWon(expectedRateDiv)) >= 0);
       assert("배당 안내문에 배당소득세 15.4%", htmlDivRate.indexOf("배당소득세") >= 0 && htmlDivRate.indexOf("15.4%") >= 0);
-      var htmlDivRateCmp = App.Render.renderView("analysis", sDivRate, rDivRate, { analysisTab: "scenarios" });
+      var htmlDivRateCmp = App.Render.renderView("analysis", sDivRate, rDivRate, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("시나리오에 영업이익 연동 배당 행", htmlDivRateCmp.indexOf("영업이익") >= 0 && htmlDivRateCmp.indexOf("대표 배당") >= 0);
       assert("시나리오에 배당소득세", htmlDivRateCmp.indexOf("배당소득세 (15.4%)") >= 0);
 
       var htmlDivOff = App.Render.renderView("simulation", sDivBase, rDivBase, { simTab: "tax" });
-      assert("배당 있음/없음 선택", htmlDivOff.indexOf("배당 있음") >= 0 && htmlDivOff.indexOf("배당 없음") >= 0);
+      assert("배당 반영함/반영안함 선택", htmlDivOff.indexOf("반영함") >= 0 && htmlDivOff.indexOf("반영안함") >= 0);
       assert("수정 버튼으로 폼 활성화", htmlDivOff.indexOf('data-action="toggle-solo-tax-edit"') >= 0 && htmlDivOff.indexOf(">수정<") >= 0);
       assert("기본은 폼 비활성", htmlDivOff.indexOf('<fieldset class="solo-tax-form" disabled>') >= 0);
       var htmlDivOnEdit = App.Render.renderView("simulation", sDivRate, rDivRate, { simTab: "tax", soloTaxFormEdit: true });
@@ -5247,10 +5407,43 @@
       var shareAmt = App.Money.roundWon(40000000 * 0.10);
       var shareTax = App.Defaults.ownerProfitShareWithholding(shareAmt);
       eq("작품 수익배분액", rShare.kpis.profitShare, shareAmt);
-      eq("수익배분은 손익비용 불변", rShare.kpis.pnlExpense, rDivBase.kpis.pnlExpense);
-      eq("수익배분 후 기말", rShare.kpis.endClosing, rDivBase.kpis.endClosing - shareAmt);
+      eq("수익정산은 매출원가에 포함", rShare.kpis.pnlExpense, rDivBase.kpis.pnlExpense + shareAmt);
+      eq("수익정산 후 영업이익", rShare.kpis.operatingProfit, rDivBase.kpis.operatingProfit - shareAmt);
+      eq("수익정산 후 기말", rShare.kpis.endClosing, rDivBase.kpis.endClosing - shareAmt);
       eq("수익배분 사업소득세 3.3%", cmpShare.ownerProfitShareTax, shareTax.total);
       eq("수익배분 세율 라벨", cmpShare.ownerProfitShareTaxLabel, "사업소득세 (3.3%)");
+      var settleGroup = ledgerGroup(rShare, "profit-settle");
+      assert("원장 수익정산 그룹", !!settleGroup);
+      var settleRow = ledgerItem(settleGroup, "[자동] 배당테스트 수익정산 · 10%");
+      assert("프로젝트별 수익정산 행", !!settleRow);
+      eq("프로젝트 수익정산액", settleRow.total, -shareAmt);
+      eq("프로젝트 수익정산 월", settleRow.values["2027-12"], -shareAmt);
+      eq("매출원가 합계에 수익정산", ledgerGroup(rShare, "cogs-total").subtotal.total,
+        App.Money.roundWon(ledgerGroup(rShare, "project").subtotal.total + settleGroup.subtotal.total +
+          ((ledgerGroup(rShare, "agency") && ledgerGroup(rShare, "agency").subtotal.total) || 0)));
+      var htmlShareLed = App.Render.renderView("analysis", sShare, rShare, { analysisTab: "monthly", ledgerOpen: { "profit-settle": true } });
+      assert("월별 분석에 수익정산", htmlShareLed.indexOf("수익정산") >= 0);
+      assert("월별 분석에 프로젝트 수익정산", htmlShareLed.indexOf("[자동] 배당테스트 수익정산") >= 0);
+      assert("수익정산은 현금흐름 소계로 중복 표시 안 함", htmlShareLed.indexOf("수익배분 소계") < 0);
+
+      var sShareTwo = clone(sDivBase);
+      sShareTwo.settings.scenarios.soloAgency.ownerPayout.dividendOn = false;
+      sShareTwo.settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate = 0.30;
+      sShareTwo.settings.scenarios.soloAgency.ownerPayout.profitShareSalesRate = 0.30;
+      var pSales = App.Defaults.newProject("2027-12", "ad");
+      pSales.name = "브랜드A";
+      pSales.status = "confirmed";
+      pSales.contractAmount = 10000000;
+      pSales.expenseInclude = false;
+      pSales.lunchTruckInclude = false;
+      pSales.payments = [Object.assign(App.Defaults.newPayment("2027-12"), { amount: 10000000, inputMode: "amount" })];
+      sShareTwo.projects = [pDiv, pSales];
+      var rShareTwo = App.Engine.runSimulation(sShareTwo);
+      var settleTwo = ledgerGroup(rShareTwo, "profit-settle");
+      assert("작품·영업 각각 수익정산", !!settleTwo && settleTwo.rows.length === 2);
+      eq("작품 30% 수익정산", ledgerItem(settleTwo, "[자동] 배당테스트 수익정산 · 30%").total, -12000000);
+      eq("영업 30% 수익정산", ledgerItem(settleTwo, "[자동] 브랜드A 수익정산 · 30%").total, -3000000);
+      eq("수익정산 KPI 합계", rShareTwo.kpis.profitShare, 15000000);
 
       var sOff = clone(sDivRate);
       sOff.settings.scenarios.soloAgency.ownerPayout.dividendOn = false;
@@ -5282,11 +5475,76 @@
     } catch (e) { fail("대표 배당 반영 예외", e.message || e); }
 
     try {
+      var rate2025 = App.PersonalTax.getBusinessExpenseRate(2025, "940302");
+      eq("배우 940302 2025 단순경비율", rate2025.simpleRate, 0.29);
+      eq("배우 940302 2025 기준경비율", rate2025.standardRate, 0.059);
+      assert("경비율 없는 연도는 자동 대체하지 않음", App.PersonalTax.getBusinessExpenseRate(2099, "940302") === null);
+
+      var sRate = App.Sample.load();
+      var rInfo = App.Defaults.resolvedProfitShareExpenseRate(sRate, 2025);
+      eq("시드 경비율 override는 기준경비율", rInfo.appliedRate, 0.059);
+      assert("시드는 override 사용", rInfo.isOverride === true);
+      eq("공식값은 단순경비율 29%", rInfo.officialRate, 0.29);
+      eq("추계 필요경비 = 수입 x 5.9%", App.Money.roundWon(100000000 * rInfo.appliedRate), 5900000);
+      eq("사업소득금액 = 수입 - 추계경비", 100000000 - App.Money.roundWon(100000000 * rInfo.appliedRate), 94100000);
+
+      sRate.settings.scenarios.soloAgency.ownerPayout.profitShareExpenseRateOverride = 0.25;
+      var rOverride = App.Defaults.resolvedProfitShareExpenseRate(sRate, 2025);
+      eq("override 후에도 공식값은 그대로", rOverride.officialRate, 0.29);
+      eq("적용값은 사용자 override", rOverride.appliedRate, 0.25);
+      assert("override 상태 표시", rOverride.isOverride === true);
+
+      sRate.settings.scenarios.soloAgency.ownerPayout.profitShareExpenseRateOverride = null;
+      var rRestored = App.Defaults.resolvedProfitShareExpenseRate(sRate, 2025);
+      eq("복원 후 적용값=공식값", rRestored.appliedRate, 0.29);
+      assert("복원 후 override 아님", rRestored.isOverride === false);
+
+      var sMerge = App.Sample.load();
+      sMerge.settings.scenarios.soloAgency.ownerPayout.dividendOn = false;
+      sMerge.settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate = 0.10;
+      sMerge.settings.scenarios.soloAgency.ownerPayout.profitShareSalesRate = 0;
+      var rMerge = App.Engine.runSimulation(sMerge);
+      var cmpMerge = App.Engine.runScenarioComparison(sMerge, rMerge).scenarios.soloAgency;
+      var mergeYears = (cmpMerge.personalTaxDetail && cmpMerge.personalTaxDetail.years) || [];
+      var mergedAny = false;
+      mergeYears.forEach(function (yd) {
+        if (!yd.businessIncome) return;
+        mergedAny = true;
+        var rInfoY = App.Defaults.resolvedProfitShareExpenseRate(sMerge, yd.year);
+        var expectedExpense = App.Money.roundWon(yd.businessIncome * rInfoY.appliedRate);
+        eq(yd.year + "년 사업소득 추계경비=수입x적용경비율", yd.necessaryExpenses, expectedExpense);
+        var expectedTaxable = App.Money.roundWon(
+          (yd.earnedGross - yd.earnedIncomeDeduction) + Math.max(0, yd.businessIncome - expectedExpense)
+        );
+        eq(yd.year + "년 과세표준=근로소득금액+사업소득금액", yd.taxableBase, expectedTaxable);
+        var separateNational = App.Engine.calculatePersonalIncomeTax(
+          App.Money.roundWon(yd.earnedGross - yd.earnedIncomeDeduction), yd.year
+        );
+        assert(yd.year + "년 결정세액은 급여 단독 세액보다 큼(합산 누진)", yd.determinedTax > separateNational.tax);
+      });
+      assert("연도별 사업소득 합산 검증 최소 1건 이상", mergedAny);
+
+      var withholding = App.Defaults.ownerProfitShareWithholding(cmpMerge.ownerProfitShareAmount);
+      eq("사업소득 원천징수(3.3%)는 정보성 값으로 유지", cmpMerge.ownerProfitShareTax, withholding.total);
+      assert("최종 세부담은 원천징수 단순합산이 아님", cmpMerge.personalTax !== undefined);
+
+      var sMergeLowRate = App.Sample.load();
+      sMergeLowRate.settings.scenarios.soloAgency.ownerPayout.dividendOn = false;
+      sMergeLowRate.settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate = 0.10;
+      sMergeLowRate.settings.scenarios.soloAgency.ownerPayout.profitShareSalesRate = 0;
+      sMergeLowRate.settings.scenarios.soloAgency.ownerPayout.profitShareExpenseRateOverride = 0;
+      var rMergeLowRate = App.Engine.runSimulation(sMergeLowRate);
+      var cmpMergeLowRate = App.Engine.runScenarioComparison(sMergeLowRate, rMergeLowRate).scenarios.soloAgency;
+      eq("경비율 0%면 원천징수는 그대로", cmpMergeLowRate.ownerProfitShareTax, cmpMerge.ownerProfitShareTax);
+      assert("경비율 0%면 최종 세부담이 더 큼(경비 공제 없음)", cmpMergeLowRate.personalTax >= cmpMerge.personalTax);
+    } catch (e) { fail("사업소득 경비율 합산 예외", e.message || e); }
+
+    try {
       var sSign = App.Defaults.ensureState(App.Sample.load());
       sSign.settings.scenarioComparison = { enabledScenarioIds: ["soloAgency", "exclusiveContract"] };
       var rSign = App.Engine.runSimulation(sSign);
       var cSign = App.Engine.runScenarioComparison(sSign, rSign);
-      var htmlSign = App.Render.renderView("analysis", sSign, rSign, { analysisTab: "scenarios" });
+      var htmlSign = App.Render.renderView("analysis", sSign, rSign, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       var htmlTaxSign = App.Render.renderView("analysis", sSign, rSign, { analysisTab: "income-tax" });
       var soloS = cSign.scenarios.soloAgency;
       var exS = cSign.scenarios.exclusiveContract;
@@ -5313,7 +5571,7 @@
       ptSign.unitAmount = 1000000;
       var rSupSign = App.Engine.runSimulation(sSign);
       var cSupSign = App.Engine.runScenarioComparison(sSign, rSupSign);
-      var htmlSupSign = App.Render.renderView("analysis", sSign, rSupSign, { analysisTab: "scenarios" });
+      var htmlSupSign = App.Render.renderView("analysis", sSign, rSupSign, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       var htmlTaxSup = App.Render.renderView("analysis", sSign, rSupSign, { analysisTab: "income-tax" });
       var supVal = cSupSign.scenarios.exclusiveContract.companySupportValue;
       assert("지원가치 엔진 원본은 양수", supVal > 0);
@@ -5345,13 +5603,13 @@
       assert("엑셀 요약에 설립기타라는 새 이름 없음", xmlXl.indexOf("설립기타") < 0);
       eq("엑셀 요약 항목합=손익비용", App.Money.roundWon(
         rXl.kpis.payroll + rXl.kpis.opex + rXl.kpis.projectExpense + rXl.kpis.lunchTruck +
-        rXl.kpis.agencyFees + rXl.kpis.startup +
+        rXl.kpis.agencyFees + rXl.kpis.startup + rXl.kpis.profitShare +
         (rXl.kpis.projectDirect - rXl.kpis.projectExpense - rXl.kpis.lunchTruck)
       ), rXl.kpis.pnlExpense);
       assert("엑셀 기말 검산 공식(부가세예수금 포함)", xmlXl.indexOf("=RC[-10]+RC[-9]+RC[-8]+RC[-7]-RC[-2]") >= 0);
       assert("엑셀 월별현금 시트에 부가세예수금 컬럼", xmlXl.indexOf("부가세예수금") >= 0);
       assert("엑셀 회사부담 안내", xmlXl.indexOf("회사(사용자) 부담만") >= 0);
-      eq("엑셀 파일명", App.Export.fileName(seedXl), "이종원_검산_2026-10_2027-12.xls");
+      eq("엑셀 파일명", App.Export.fileName(seedXl), "배우_검산_2026-10_2027-12.xls");
       var sEsc = empty();
       sEsc.profile.startMonth = "2027-01";
       sEsc.profile.endMonth = "2027-01";
@@ -5481,7 +5739,7 @@
       assert("하단 cashMove 행 없음", !ledgerResult(rDepOnce, "cashMove"));
       assert("하단 cashDelta 행 없음", !ledgerResult(rDepOnce, "cashDelta"));
       eq("12월 월초=11월 월말", monthRow(rDepOnce, "2026-12").opening, novDep.closing);
-      var htmlDepOnce = App.Render.renderView("analysis", sDepOnce, rDepOnce, { analysisTab: "monthly" });
+      var htmlDepOnce = App.Render.renderView("analysis", sDepOnce, rDepOnce, { analysisTab: "monthly", ledgerOpen: { cashflow: true } });
       assert("하단 자산·보증금/기타입금 없음", htmlDepOnce.indexOf("자산·보증금·기타입금") < 0 &&
         htmlDepOnce.indexOf("자산·보증금/기타입금") < 0);
       assert("현금증감 행 없음", htmlDepOnce.indexOf("현금증감") < 0);
@@ -5507,7 +5765,7 @@
       assert("원장 분리 지방세행 없음", !ledgerResult(rTaxPay, "taxLocal"));
       eq("지정월 세후월말=통장", monthRow(rTaxPay, "2026-12").closingAfterTax, decPay.closing);
       eq("11월은 법인세 미납부", monthRow(rTaxPay, "2026-11").taxCashOut, 0);
-      var htmlTaxPay = App.Render.renderView("analysis", sDepOnce, rTaxPay, { analysisTab: "monthly" });
+      var htmlTaxPay = App.Render.renderView("analysis", sDepOnce, rTaxPay, { analysisTab: "monthly", ledgerOpen: { cashflow: true } });
       assert("법인세 및 주민세 납부 표시", htmlTaxPay.indexOf("법인세 및 주민세 납부") >= 0);
       assert("법인지방소득세 분리행 없음", htmlTaxPay.indexOf("법인지방소득세 납부") < 0);
     } catch (e) { fail("월별 현금흐름 구조 예외", e.message || e); }
@@ -5596,7 +5854,7 @@
       eq("VAT 4월 납부액 -10,000,000", monthRow(rVat, "2026-04").vatSettlement, 10000000);
       eq("원장 부가세 예수금=vatOutput", ledgerResult(rVat, "vatOutput").values["2026-03"], 10000000);
       eq("원장 부가세 납부=-vatSettlement", ledgerResult(rVat, "vatSettlement").values["2026-04"], -10000000);
-      var htmlVat = App.Render.renderView("analysis", sVat, rVat, { analysisTab: "monthly" });
+      var htmlVat = App.Render.renderView("analysis", sVat, rVat, { analysisTab: "monthly", ledgerOpen: { cashflow: true } });
       assert("부가세 예수금 행", htmlVat.indexOf("부가세 예수금") >= 0);
       assert("부가세 납부 행", htmlVat.indexOf("부가세 납부") >= 0);
       var tableVat = htmlVat.slice(htmlVat.indexOf('<table class="ledger'));
@@ -5666,7 +5924,7 @@
       rKpi0.kpis.corporateTaxPending = 0;
       rKpi0.kpis.localTaxPending = 0;
       rKpi0.kpis.minClosing = 5000000;
-      var htmlKpi0 = App.Render.renderView("analysis", sKpi, rKpi0, {});
+      var htmlKpi0 = App.Render.renderView("analysis", sKpi, rKpi0, { analysisFoldOpen: { cash: true } });
       var occur100M = (htmlKpi0.match(new RegExp(W(100000000).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
       assert("미납세금 0이면 기말현금·실질가용현금 동일값 두 번 표시", occur100M >= 2);
       assert("미납세금 0이면 납부할 세금 0원", htmlKpi0.indexOf(W(0)) >= 0);
@@ -5675,7 +5933,7 @@
       assert("VAT 단독 시나리오는 실제로 미납 VAT를 가짐", rVatOnly.kpis.vatPendingLiability === 10000000);
       rVatOnly.kpis.corporateTaxPending = 0;
       rVatOnly.kpis.localTaxPending = 0;
-      var htmlKpiVat = App.Render.renderView("analysis", sVatPending, rVatOnly, {});
+      var htmlKpiVat = App.Render.renderView("analysis", sVatPending, rVatOnly, { analysisFoldOpen: { cash: true } });
       assert("VAT만 미납이면 납부할 세금=VAT 금액", htmlKpiVat.indexOf(W(10000000)) >= 0);
       assert("VAT만 미납이면 실질 가용현금=기말-VAT",
         htmlKpiVat.indexOf(W(rVatOnly.kpis.endClosing - 10000000)) >= 0);
@@ -5686,18 +5944,18 @@
       rKpi2.kpis.corporateTaxPending = 8000000;
       rKpi2.kpis.localTaxPending = 800000;
       rKpi2.kpis.deposits = 999999999;
-      var htmlKpi2 = App.Render.renderView("analysis", sKpi, rKpi2, {});
+      var htmlKpi2 = App.Render.renderView("analysis", sKpi, rKpi2, { analysisFoldOpen: { cash: true } });
       assert("법인세+지방세 미납 합산 표시", htmlKpi2.indexOf(W(8800000)) >= 0);
       assert("실질 가용현금=기말-법인세-지방세(보증금 재차감 없음)", htmlKpi2.indexOf(W(91200000)) >= 0);
 
-      var htmlKpi2Detail = App.Render.renderView("analysis", sKpi, rKpi2, { analysisTaxHelpOpen: true });
+      var htmlKpi2Detail = App.Render.renderView("analysis", sKpi, rKpi2, { analysisTaxHelpOpen: true, analysisFoldOpen: { cash: true } });
       assert("납부할 세금 상세에 법인세 금액", htmlKpi2Detail.indexOf(W(8000000)) >= 0);
       assert("납부할 세금 상세에 지방소득세 금액", htmlKpi2Detail.indexOf(W(800000)) >= 0);
       assert("납부할 세금 상세 합계", htmlKpi2Detail.indexOf(W(8800000)) >= 0);
 
       var seedKpiReal = App.Sample.load();
       var rKpiReal = App.Engine.runSimulation(seedKpiReal);
-      var htmlKpiReal = App.Render.renderView("analysis", seedKpiReal, rKpiReal, {});
+      var htmlKpiReal = App.Render.renderView("analysis", seedKpiReal, rKpiReal, { analysisFoldOpen: { cash: true } });
       eq("기말 현금잔액 카드 = 마지막 월 closing", rKpiReal.kpis.endClosing,
         rKpiReal.months[rKpiReal.months.length - 1].closing);
       assert("기말 현금잔액 카드에 실제 kpis.endClosing 표시", htmlKpiReal.indexOf(W(rKpiReal.kpis.endClosing)) >= 0);
@@ -5891,7 +6149,7 @@
       var cmpCorp = App.Engine.runScenarioComparison(seedCorp, rCorp);
       var byYearCorp = rCorp.kpis.taxDetail.byYear;
       var years2 = Object.keys(byYearCorp);
-      var htmlCorp = App.Render.renderView("analysis", seedCorp, rCorp, { analysisTab: "scenarios" });
+      var htmlCorp = App.Render.renderView("analysis", seedCorp, rCorp, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       eq("경제가치 법인현금=통장-미납법인세주민세",
         cmpCorp.scenarios.soloAgency.corporateCashForEconomicValue,
         App.Money.roundWon(rCorp.kpis.endClosing - rCorp.kpis.corporateTaxPending - rCorp.kpis.localTaxPending));
@@ -5924,7 +6182,7 @@
         htmlCorp.indexOf("세후순이익") >= 0);
       assert("전체 누적 통장잔액은 별도 라벨로 구분", htmlCorp.indexOf("전체 세후 법인잔여") >= 0);
       assert("법인 카드에 설명 도움말 버튼 존재", htmlCorp.indexOf("open-scenario-corp-help") >= 0);
-      var htmlCorpHelp = App.Render.renderView("analysis", seedCorp, rCorp, { analysisTab: "scenarios", scenarioCorpHelpOpen: true });
+      var htmlCorpHelp = App.Render.renderView("analysis", seedCorp, rCorp, { analysisTab: "scenarios", scenarioCorpHelpOpen: true, analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("두 개념이 다를 수 있다는 안내 문구는 도움말 안에 존재", htmlCorpHelp.indexOf("실제 통장잔액이라") >= 0);
       assert("설명문은 카드 본문에는 상시 노출되지 않음", htmlCorp.indexOf("실제 통장잔액이라") < 0);
       var cashEv = cmpCorp.scenarios.soloAgency.corporateCashForEconomicValue;
@@ -5948,9 +6206,9 @@
       var seedPerson = App.Sample.load();
       var rPerson = App.Engine.runSimulation(seedPerson);
       var cmpPerson = App.Engine.runScenarioComparison(seedPerson, rPerson);
-      var htmlPerson = App.Render.renderView("analysis", seedPerson, rPerson, { analysisTab: "scenarios" });
+      var htmlPerson = App.Render.renderView("analysis", seedPerson, rPerson, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       var htmlPersonTax = App.Render.renderView("analysis", seedPerson, rPerson, { analysisTab: "income-tax" });
-      var htmlPersonHelp = App.Render.renderView("analysis", seedPerson, rPerson, { analysisTab: "scenarios", scenarioSoloPersonHelpOpen: true });
+      var htmlPersonHelp = App.Render.renderView("analysis", seedPerson, rPerson, { analysisTab: "scenarios", scenarioSoloPersonHelpOpen: true, analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("대표 개인 카드에 설명 도움말 버튼 존재", htmlPerson.indexOf("open-scenario-solo-person-help") >= 0);
       assert("대표 개인 상세보기에 연도별 합산 안내 문구는 도움말 안에 존재",
         htmlPersonHelp.indexOf("각 귀속연도를 따로 계산한 뒤 더하며") >= 0);
@@ -5992,8 +6250,8 @@
       var rExPerson = App.Engine.runSimulation(seedExPerson);
       var cmpExPerson = App.Engine.runScenarioComparison(seedExPerson, rExPerson);
       var exPerson = cmpExPerson.scenarios.exclusiveContract;
-      var htmlExPerson = App.Render.renderView("analysis", seedExPerson, rExPerson, { analysisTab: "scenarios" });
-      var htmlExPersonHelp = App.Render.renderView("analysis", seedExPerson, rExPerson, { analysisTab: "scenarios", scenarioExPersonHelpOpen: true });
+      var htmlExPerson = App.Render.renderView("analysis", seedExPerson, rExPerson, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
+      var htmlExPersonHelp = App.Render.renderView("analysis", seedExPerson, rExPerson, { analysisTab: "scenarios", scenarioExPersonHelpOpen: true, analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("배우 개인 상세보기에 배우 부담 지원비 행 표시", htmlExPerson.indexOf("배우 부담 지원비") >= 0);
       assert("배우 개인 카드에 설명 도움말 버튼 존재", htmlExPerson.indexOf("open-scenario-ex-person-help") >= 0);
       assert("배우 귀속소득이 배분 전 금액이라는 안내는 도움말 안에 존재", htmlExPersonHelp.indexOf("빼기 전 금액입니다") >= 0);
@@ -6112,6 +6370,548 @@
         !new RegExp('data-path="projects\\.0\\.payments\\.0\\.expectedMonth"[^>]*type="month"').test(htmlPayMonth));
       assert("2026-11로 정상 표시", htmlPayMonth.indexOf('value="2026-11"') >= 0);
     } catch (e) { fail("예상 입금일 직접 입력 예외", e.message || e); }
+
+    try {
+      function within1(name, actual, expected) {
+        assert(name, Math.abs(App.Money.roundWon(actual) - App.Money.roundWon(expected)) <= 1,
+          "expected ~" + expected + " got " + actual);
+      }
+      function fitFinite(fit) {
+        var nums = [
+          fit.revenue, fit.operatingCost, fit.pool, fit.poolLimit, fit.slack,
+          fit.current.salary, fit.current.incentive, fit.current.insurance, fit.current.severance,
+          fit.current.salaryPackage, fit.current.profitSettle, fit.current.dividend,
+          fit.current.ownerCompanyCost, fit.current.ownerGross,
+          fit.recommended.salary, fit.recommended.profitSettle, fit.recommended.dividend,
+          fit.recommended.ownerCompanyCost, fit.notes.minClosing, fit.notes.endClosing
+        ];
+        return nums.every(function (n) { return Number.isFinite(n); });
+      }
+
+      var sFitEmpty = empty();
+      var rFitEmpty = App.Engine.runSimulation(sFitEmpty);
+      var fitEmpty = App.Engine.analyzeOwnerPayoutFit(sFitEmpty, rFitEmpty);
+      assert("인출적정 empty 함수 존재", typeof App.Engine.analyzeOwnerPayoutFit === "function");
+      assert("인출적정 empty NaN 없음", fitFinite(fitEmpty));
+      eq("인출적정 empty 매출 0", fitEmpty.revenue, 0);
+      eq("인출적정 empty 가용재원 = 매출-운영원가", fitEmpty.pool, App.Money.roundWon(fitEmpty.revenue - fitEmpty.operatingCost));
+      within1("인출적정 empty 운영원가+대표패키지+정산 = 손익비용",
+        fitEmpty.operatingCost + fitEmpty.current.salaryPackage + fitEmpty.current.profitSettle,
+        rFitEmpty.kpis.pnlExpense);
+      eq("인출적정 empty 시드현금 불변", rFitEmpty.kpis.endClosing, 0);
+
+      var sFitSeed = App.Sample.load();
+      var rFitSeed = App.Engine.runSimulation(sFitSeed);
+      var fitSeed = App.Engine.analyzeOwnerPayoutFit(sFitSeed, rFitSeed);
+      eq("인출적정 시드 기말현금 불변", rFitSeed.kpis.endClosing, 581708190);
+      eq("인출적정 시드 최저잔액 불변", rFitSeed.kpis.minClosing, 34581828);
+      eq("인출적정 시드 노트 기말 = KPI", fitSeed.notes.endClosing, rFitSeed.kpis.endClosing);
+      eq("인출적정 시드 노트 최저 = KPI", fitSeed.notes.minClosing, rFitSeed.kpis.minClosing);
+      assert("인출적정 시드 NaN 없음", fitFinite(fitSeed));
+      eq("인출적정 시드 가용재원 = 매출-운영원가", fitSeed.pool, App.Money.roundWon(fitSeed.revenue - fitSeed.operatingCost));
+      within1("인출적정 시드 운영원가+대표패키지+정산 = 손익비용",
+        fitSeed.operatingCost + fitSeed.current.salaryPackage + fitSeed.current.profitSettle,
+        rFitSeed.kpis.pnlExpense);
+      within1("인출적정 여유 = 영업이익-배당", fitSeed.slack, rFitSeed.kpis.operatingProfit - rFitSeed.kpis.dividend);
+      eq("인출적정 시드 수익정산", fitSeed.current.profitSettle, 615000000);
+      eq("인출적정 시드 추천 수익정산", fitSeed.recommended.profitSettle, 615000000);
+      eq("인출적정 시드 월수", fitSeed.monthCount, 15);
+      assert("인출적정 시드 연도 2개", fitSeed.years && fitSeed.years.length === 2 &&
+        fitSeed.years[0].year === 2026 && fitSeed.years[1].year === 2027);
+      eq("인출적정 시드 2026 개월", fitSeed.years[0].monthCount, 3);
+      eq("인출적정 시드 2027 개월", fitSeed.years[1].monthCount, 12);
+      assert("인출적정 넣어보기 함수 존재", typeof App.Engine.evaluateOwnerPayoutTrial === "function");
+      var trialMonth = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: 6000000,
+        profitSettleRate: 0.25,
+        dividend: 0
+      });
+      eq("인출적정 월급여→연봉", trialMonth.annualSalary, 72000000);
+      eq("인출적정 월급여 기간합", trialMonth.salaryInc, 90000000);
+      eq("인출적정 2026 급여", trialMonth.years[0].salary, 18000000);
+      eq("인출적정 2027 급여", trialMonth.years[1].salary, 72000000);
+      within1("인출적정 연도별 정산 합 = 기간 정산",
+        trialMonth.years[0].profitSettle + trialMonth.years[1].profitSettle,
+        trialMonth.profitSettle);
+      eq("인출적정 정산=매출×율", trialMonth.profitSettle, App.Money.roundWon(fitSeed.revenue * 0.25));
+      eq("인출적정 시드 수익정산 반영함", fitSeed.current.profitSettleOn, true);
+      var trialSettleOff = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettleOn: false,
+        profitSettleRate: 0.25,
+        dividendOn: false
+      });
+      eq("인출적정 정산 반영안함이면 0", trialSettleOff.profitSettle, 0);
+      var trialSettleOn = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettleOn: true,
+        profitSettleRate: 0.25,
+        dividendOn: false
+      });
+      eq("인출적정 정산 반영함=매출×율", trialSettleOn.profitSettle, App.Money.roundWon(fitSeed.revenue * 0.25));
+      assert("인출적정 넣어보기 영업이익 숫자", Number.isFinite(trialSettleOn.operatingProfit));
+      assert("인출적정 정산 켜면 영업이익 감소", trialSettleOn.operatingProfit < trialSettleOff.operatingProfit);
+      var trialSame = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        salaryInc: fitSeed.current.salary + fitSeed.current.incentive,
+        profitSettle: fitSeed.current.profitSettle,
+        dividend: fitSeed.current.dividend
+      });
+      within1("인출적정 넣어보기=지금 회사부담", trialSame.ownerCompanyCost, fitSeed.current.ownerCompanyCost);
+      var trialHuge = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        salaryInc: fitSeed.poolLimit + 1,
+        profitSettle: 0,
+        dividend: 0
+      });
+      assert("인출적정 넣어보기 초과 판정", trialHuge.verdict === "over");
+      assert("인출적정 운영원가에 배당 없음",
+        Math.abs((fitSeed.operatingCost + fitSeed.current.salaryPackage + fitSeed.current.profitSettle) - rFitSeed.kpis.pnlExpense) <= 1);
+      assert("인출적정 운영원가에 대표급여 없음",
+        fitSeed.operatingCost === App.Money.roundWon(rFitSeed.kpis.pnlExpense - fitSeed.current.salaryPackage - fitSeed.current.profitSettle));
+      var rFitSeedAgain = App.Engine.runSimulation(sFitSeed);
+      eq("인출적정 분석 후 재시뮬 기말 불변", rFitSeedAgain.kpis.endClosing, 581708190);
+      assert("인출적정 미리보기 함수", typeof App.Engine.previewOwnerPayoutTrial === "function");
+      var ownerFitEmp = App.Engine.findOwnerEmployee(sFitSeed);
+      eq("인출적정 원본 월급여", ownerFitEmp.monthlySalary, 5000000);
+      var previewLow = App.Engine.previewOwnerPayoutTrial(sFitSeed, rFitSeed, {
+        monthlySalary: 5000000, profitSettle: 0, profitSettleRate: 0, dividend: 0
+      });
+      assert("인출적정 미리보기 생성", !!previewLow && !!previewLow.result);
+      eq("인출적정 미리보기 대표 기간급여", previewLow.result.ledger.ceoSalary, 75000000);
+      eq("인출적정 미리보기 후 원본 월급여 불변", ownerFitEmp.monthlySalary, 5000000);
+      eq("인출적정 미리보기 후 원본 기말 불변", rFitSeed.kpis.endClosing, 581708190);
+      eq("인출적정 미리보기 후 재시뮬 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      eq("인출적정 미리보기 후 정산율 불변",
+        sFitSeed.settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate, 0.3);
+      var previewSettle = App.Engine.previewOwnerPayoutTrial(sFitSeed, rFitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettleRate: 0.25,
+        dividend: 0
+      });
+      within1("인출적정 미리보기 정산=넣어보기 금액",
+        previewSettle.result.kpis.profitShare, App.Money.roundWon(fitSeed.revenue * 0.25));
+      var previewSame = App.Engine.previewOwnerPayoutTrial(sFitSeed, rFitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettle: fitSeed.current.profitSettle,
+        profitSettleRate: fitSeed.current.profitSettleRate,
+        dividend: fitSeed.current.dividend
+      });
+      assert("인출적정 지금과 같으면 미리보기 생략", previewSame == null);
+      eq("인출적정 시드 배당 반영안함", fitSeed.current.dividendOn, false);
+      eq("인출적정 시드 배당액 0", fitSeed.current.dividend, 0);
+      var trialDivOn = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettle: 0,
+        profitSettleRate: 0,
+        dividendOn: true,
+        dividendRate: 0.10
+      });
+      assert("인출적정 반영함이면 배당>0", trialDivOn.dividend > 0);
+      eq("인출적정 반영함 율 10%", trialDivOn.dividendRate, 0.1);
+      eq("인출적정 반영함 하단 배당=실지급", trialDivOn.payoutTax.dividend.gross, trialDivOn.dividend);
+      eq("인출적정 반영함 2027 배당소득세", trialDivOn.payoutTax.years[1].dividend.national,
+        App.Defaults.ownerDividendWithholding(trialDivOn.years[1].dividend).national);
+      eq("인출적정 반영함 2027 주민세(배당)", trialDivOn.payoutTax.years[1].dividend.local,
+        App.Defaults.ownerDividendWithholding(trialDivOn.years[1].dividend).local);
+      var trialDivOff = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettle: 0,
+        dividendOn: false,
+        dividendRate: 0.10
+      });
+      eq("인출적정 반영안함이면 배당 0", trialDivOff.dividend, 0);
+      assert("인출적정 반영안함이어도 배당 계산", trialDivOff.dividendPreview > 0);
+      eq("인출적정 반영안함 2027 계산=율×영업이익", trialDivOff.years[1].dividendPreview,
+        trialDivOff.years[1].operatingProfit > 0
+          ? App.Money.roundWon(trialDivOff.years[1].operatingProfit * 0.10) : 0);
+      eq("인출적정 반영안함 미리보기 합=연도 계산", trialDivOff.dividendPreview,
+        App.Money.roundWon((trialDivOff.years[0].dividendPreview || 0) + (trialDivOff.years[1].dividendPreview || 0)));
+      assert("인출적정 세금 합계 존재", !!trialDivOff.payoutTax);
+      assert("인출적정 세금 연도 2개", trialDivOff.payoutTax.years && trialDivOff.payoutTax.years.length === 2);
+      eq("인출적정 세금 2026 연도", trialDivOff.payoutTax.years[0].year, 2026);
+      eq("인출적정 세금 2027 연도", trialDivOff.payoutTax.years[1].year, 2027);
+      eq("인출적정 세금 2026 급여 세전", trialDivOff.payoutTax.years[0].salary.gross, trialDivOff.years[0].salary);
+      eq("인출적정 세금 2027 급여 세전", trialDivOff.payoutTax.years[1].salary.gross, trialDivOff.years[1].salary);
+      assert("인출적정 세금 2026 급여세 >0", trialDivOff.payoutTax.years[0].salary.tax > 0);
+      assert("인출적정 세금 2027 급여세 >0", trialDivOff.payoutTax.years[1].salary.tax > 0);
+      eq("인출적정 세금 급여 세전", trialDivOff.payoutTax.salary.gross, trialDivOff.salaryInc);
+      assert("인출적정 세금 급여세 >0", trialDivOff.payoutTax.salary.tax > 0);
+      eq("인출적정 세금 급여 세후", trialDivOff.payoutTax.salary.net,
+        App.Money.roundWon(trialDivOff.payoutTax.salary.gross - trialDivOff.payoutTax.salary.tax));
+      eq("인출적정 세금 정산 0", trialDivOff.payoutTax.profitSettle.gross, 0);
+      eq("인출적정 반영안함 하단 배당 0", trialDivOff.payoutTax.dividend.gross, 0);
+      eq("인출적정 반영안함 하단 배당세 0", trialDivOff.payoutTax.dividend.tax, 0);
+      eq("인출적정 반영안함 하단 배당 세후 0", trialDivOff.payoutTax.dividend.net, 0);
+      eq("인출적정 반영안함 합계세후=급여+정산", trialDivOff.payoutTax.net,
+        App.Money.roundWon(trialDivOff.payoutTax.salary.net + trialDivOff.payoutTax.profitSettle.net));
+      assert("인출적정 세금 2026 근로소득세 >0", trialDivOff.payoutTax.years[0].salary.national > 0);
+      eq("인출적정 세금 2026 주민세(근로)", trialDivOff.payoutTax.years[0].salary.local,
+        trialDivOff.payoutTax.years[0].salary.tax - trialDivOff.payoutTax.years[0].salary.national);
+      eq("인출적정 세금 배당 세전=실지급", trialDivOff.payoutTax.dividend.gross, trialDivOff.dividend);
+      within1("인출적정 세금 배당=연도합",
+        trialDivOff.payoutTax.dividend.tax,
+        trialDivOff.payoutTax.years[0].dividend.tax + trialDivOff.payoutTax.years[1].dividend.tax);
+      eq("인출적정 세금 세후합=세전-세", trialDivOff.payoutTax.net,
+        App.Money.roundWon(trialDivOff.payoutTax.gross - trialDivOff.payoutTax.tax));
+      eq("인출적정 전체합계 세후=연도합", trialDivOff.payoutTax.net,
+        App.Money.roundWon(trialDivOff.payoutTax.years[0].net + trialDivOff.payoutTax.years[1].net));
+      eq("인출적정 전체합계 금액=연도합", trialDivOff.payoutTax.gross,
+        App.Money.roundWon(trialDivOff.payoutTax.years[0].gross + trialDivOff.payoutTax.years[1].gross));
+      var trialSettleOn = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: 5000000,
+        monthlySalaryByYear: { 2026: 5000000, 2027: 5000000 },
+        profitSettleOn: true,
+        profitSettleRateByYear: { 2026: 0.269, 2027: 0.294 },
+        dividendOn: false,
+        dividendRate: 0.10
+      });
+      var settleNetSum = App.Money.roundWon(
+        trialSettleOn.payoutTax.years[0].net + trialSettleOn.payoutTax.years[1].net
+      );
+      eq("인출적정 정산반영 전체세후=연도세후합", trialSettleOn.payoutTax.net, settleNetSum);
+      var htmlSettleOn = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        payoutFitTrial: {
+          monthlySalary: 5000000,
+          monthlySalaryByYear: { 2026: 5000000, 2027: 5000000 },
+          profitSettleOn: true,
+          profitSettleRateByYear: { 2026: 0.269, 2027: 0.294 },
+          dividendOn: false,
+          dividendRate: 0.10
+        }
+      });
+      var taxSettleHtml = htmlSettleOn.slice(htmlSettleOn.indexOf("payout-fit-tax-years"));
+      var taxSettleCut = taxSettleHtml.indexOf("payout-fit-lines");
+      if (taxSettleCut > 0) taxSettleHtml = taxSettleHtml.slice(0, taxSettleCut);
+      assert("인출적정 전체합계 세후가 연도세후 합",
+        taxSettleHtml.indexOf(App.Format.formatWon(settleNetSum)) >= 0 &&
+        taxSettleHtml.indexOf(App.Format.formatWon(trialSettleOn.payoutTax.years[0].net)) >= 0 &&
+        taxSettleHtml.indexOf(App.Format.formatWon(trialSettleOn.payoutTax.years[1].net)) >= 0);
+      var grandEqHtml = taxSettleHtml.slice(taxSettleHtml.indexOf("payout-fit-tax-grand-eq"));
+      grandEqHtml = grandEqHtml.slice(0, grandEqHtml.indexOf("</div>") + 6);
+      assert("인출적정 전체합계는 연도세후를 더함",
+        grandEqHtml.indexOf(App.Format.formatWon(trialSettleOn.payoutTax.years[0].net)) >= 0 &&
+        grandEqHtml.indexOf("+") >= 0 &&
+        grandEqHtml.indexOf(App.Format.formatWon(trialSettleOn.payoutTax.years[1].net)) >= 0 &&
+        grandEqHtml.indexOf(App.Format.formatWon(settleNetSum)) >= 0);
+      eq("인출적정 정산반영 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      eq("인출적정 세금 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      var uiDivRate = {};
+      App.Render.applyPayoutFitDraft(sFitSeed, rFitSeed, uiDivRate, "dividendRate.2027", 0.20);
+      var trialRateNow = App.Engine.evaluateOwnerPayoutTrial(fitSeed, uiDivRate.payoutFitTrial);
+      eq("인출적정 율 입력 즉시 배당 계산", trialRateNow.years[1].dividendPreview,
+        trialRateNow.years[1].operatingProfit > 0
+          ? App.Money.roundWon(trialRateNow.years[1].operatingProfit * 0.20) : 0);
+      eq("인출적정 율 입력 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      var trialDivLowPay = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: 3000000,
+        profitSettle: 0,
+        dividendOn: true,
+        dividendRate: 0.10
+      });
+      assert("인출적정 급여 내리면 배당 증가", trialDivLowPay.dividend > trialDivOn.dividend);
+      var previewDivOn = App.Engine.previewOwnerPayoutTrial(sFitSeed, rFitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettle: fitSeed.current.profitSettle,
+        profitSettleRate: 0,
+        dividendOn: true,
+        dividendRate: 0.10
+      });
+      assert("인출적정 반영함 미리보기", !!previewDivOn && previewDivOn.result.kpis.dividend > 0);
+      eq("인출적정 반영함 후 시드 배당 꺼짐", sFitSeed.settings.scenarios.soloAgency.ownerPayout.dividendOn, false);
+      eq("인출적정 반영함 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+
+      var trialYearMix = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: 6000000,
+        monthlySalaryByYear: { "2026": 5000000, "2027": 8000000 },
+        profitSettleOn: true,
+        profitSettleRate: 0.1,
+        profitSettleRateByYear: { "2026": 0.1, "2027": 0.2 },
+        dividendOn: true,
+        dividendRate: 0.1,
+        dividendRateByYear: { "2026": 0.05, "2027": 0.10 }
+      });
+      eq("인출적정 연도별 2026 급여", trialYearMix.years[0].salary, 15000000);
+      eq("인출적정 연도별 2027 급여", trialYearMix.years[1].salary, 96000000);
+      eq("인출적정 연도별 기간급여 합", trialYearMix.salaryInc, 111000000);
+      eq("인출적정 연도별 2026 정산", trialYearMix.years[0].profitSettle,
+        App.Money.roundWon(fitSeed.years[0].revenue * 0.1));
+      eq("인출적정 연도별 2027 정산", trialYearMix.years[1].profitSettle,
+        App.Money.roundWon(fitSeed.years[1].revenue * 0.2));
+      within1("인출적정 연도별 정산 합",
+        trialYearMix.years[0].profitSettle + trialYearMix.years[1].profitSettle,
+        trialYearMix.profitSettle);
+      eq("인출적정 세금 2026 정산=3.3%", trialYearMix.payoutTax.years[0].profitSettle.tax,
+        App.Defaults.ownerProfitShareWithholding(trialYearMix.years[0].profitSettle).total);
+      eq("인출적정 세금 2027 정산=3.3%", trialYearMix.payoutTax.years[1].profitSettle.tax,
+        App.Defaults.ownerProfitShareWithholding(trialYearMix.years[1].profitSettle).total);
+      eq("인출적정 세금 2027 사업소득세", trialYearMix.payoutTax.years[1].profitSettle.national,
+        App.Defaults.ownerProfitShareWithholding(trialYearMix.years[1].profitSettle).national);
+      eq("인출적정 세금 2027 주민세(사업)", trialYearMix.payoutTax.years[1].profitSettle.local,
+        App.Defaults.ownerProfitShareWithholding(trialYearMix.years[1].profitSettle).local);
+      eq("인출적정 세금 정산 세전", trialYearMix.payoutTax.profitSettle.gross, trialYearMix.profitSettle);
+      within1("인출적정 세금 정산=연도합",
+        trialYearMix.payoutTax.profitSettle.tax,
+        trialYearMix.payoutTax.years[0].profitSettle.tax + trialYearMix.payoutTax.years[1].profitSettle.tax);
+      eq("인출적정 연도별 2026 배당=영업이익×5%", trialYearMix.years[0].dividend,
+        trialYearMix.years[0].operatingProfit > 0
+          ? App.Money.roundWon(trialYearMix.years[0].operatingProfit * 0.05) : 0);
+      eq("인출적정 연도별 2027 배당=영업이익×10%", trialYearMix.years[1].dividend,
+        trialYearMix.years[1].operatingProfit > 0
+          ? App.Money.roundWon(trialYearMix.years[1].operatingProfit * 0.10) : 0);
+      var trialDivAmt = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettleOn: false,
+        dividendOn: true,
+        dividendRate: 0.10,
+        dividendRateByYear: { "2026": 0.10, "2027": 0.10 },
+        dividendModeByYear: { "2026": "rate", "2027": "amount" },
+        dividendByYear: { "2027": 36700000 }
+      });
+      eq("인출적정 2027 배당 금액 입력", trialDivAmt.years[1].dividend,
+        trialDivAmt.years[1].operatingProfit > 0 ? 36700000 : 0);
+      var previewDivAmt = App.Engine.previewOwnerPayoutTrial(sFitSeed, rFitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettleOn: false,
+        profitSettle: 0,
+        dividendOn: true,
+        dividendRate: 0.10,
+        dividendRateByYear: { "2026": 0, "2027": 0 },
+        dividendModeByYear: { "2026": "rate", "2027": "amount" },
+        dividendByYear: { "2027": 36700000 }
+      });
+      assert("인출적정 배당 금액 미리보기", !!previewDivAmt && previewDivAmt.result.kpis.dividend > 0);
+      eq("인출적정 배당 금액 미리보기 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      var previewYearPay = App.Engine.previewOwnerPayoutTrial(sFitSeed, rFitSeed, {
+        monthlySalary: 6000000,
+        monthlySalaryByYear: { "2026": 5000000, "2027": 8000000 },
+        profitSettleOn: false,
+        profitSettle: 0,
+        dividendOn: false
+      });
+      assert("인출적정 연도별 급여 미리보기", !!previewYearPay && !!previewYearPay.result);
+      eq("인출적정 연도별 미리보기 기간급여", previewYearPay.result.ledger.ceoSalary, 111000000);
+      eq("인출적정 연도별 미리보기 후 원본 월급여", ownerFitEmp.monthlySalary, 5000000);
+      assert("인출적정 연도별 미리보기 후 원본 연도급여 없음", !ownerFitEmp.monthlySalaryByYear);
+      var previewYearSettle = App.Engine.previewOwnerPayoutTrial(sFitSeed, rFitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettleOn: true,
+        profitSettleRateByYear: { "2026": 0.10, "2027": 0.20 },
+        dividendOn: false
+      });
+      var yearSettleExpect = App.Money.roundWon(fitSeed.years[0].revenue * 0.10) +
+        App.Money.roundWon(fitSeed.years[1].revenue * 0.20);
+      assert("인출적정 연도별 미리보기 정산",
+        Math.abs(previewYearSettle.result.kpis.profitShare - yearSettleExpect) <= 2,
+        "expected ~" + yearSettleExpect + " got " + previewYearSettle.result.kpis.profitShare);
+      eq("인출적정 연도별 미리보기 후 정산율 불변",
+        sFitSeed.settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate, 0.3);
+      assert("인출적정 연도별 미리보기 후 원본에 연도별 율 없음",
+        sFitSeed.settings.scenarios.soloAgency.ownerPayout.profitShareRateByYear == null &&
+        sFitSeed.settings.scenarios.soloAgency.ownerPayout.dividendRateByYear == null);
+      eq("인출적정 연도별 미리보기 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      eq("인출적정 연도별 미리보기 후 시드 최저 불변", App.Engine.runSimulation(sFitSeed).kpis.minClosing, 34581828);
+
+      var sOver = empty();
+      sOver.profile.startMonth = "2026-01";
+      sOver.profile.endMonth = "2026-01";
+      (sOver.revenueFees || []).forEach(function (fee) { fee.include = false; });
+      var overProject = App.Defaults.newProject("2026-01", "drama");
+      overProject.name = "한도테스트";
+      overProject.contractAmount = 10000000;
+      overProject.expenseInclude = false;
+      overProject.lunchTruckInclude = false;
+      overProject.payments = [Object.assign(App.Defaults.newPayment("2026-01"), {
+        amount: 10000000, inputMode: "amount"
+      })];
+      sOver.projects = [overProject];
+      sOver.employees = [{
+        id: "ceo-fit", name: "대표", role: "대표이사", monthlySalary: 8000000,
+        include: true, insure: false, meal: false, severance: false
+      }];
+      App.Defaults.ensureScenarioSettings(sOver);
+      sOver.settings.scenarios.soloAgency.ownerPayout.salaryEmployeeId = "ceo-fit";
+      sOver.settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate = 0.5;
+      sOver.settings.scenarios.soloAgency.ownerPayout.profitShareSalesRate = 0.5;
+      sOver.settings.scenarios.soloAgency.ownerPayout.dividendOn = false;
+      var rOver = App.Engine.runSimulation(sOver);
+      var fitOver = App.Engine.analyzeOwnerPayoutFit(sOver, rOver);
+      assert("인출적정 초과 판정", fitOver.verdict === "over");
+      assert("인출적정 초과 시 지금 > 한도", fitOver.current.ownerCompanyCost > fitOver.poolLimit);
+      assert("인출적정 추천 회사부담 ≤ 한도",
+        fitOver.recommended.ownerCompanyCost <= fitOver.poolLimit + 1);
+      assert("인출적정 초과 시 정산 또는 급여를 줄임",
+        fitOver.recommended.profitSettle < fitOver.current.profitSettle ||
+        (fitOver.recommended.salary + fitOver.recommended.incentive) < (fitOver.current.salary + fitOver.current.incentive));
+      eq("인출적정 초과 샌드박스 후 시드 기말 불변", App.Engine.runSimulation(App.Sample.load()).kpis.endClosing, 581708190);
+
+      var htmlFitClosed = App.Render.renderView("analysis", sFitSeed, rFitSeed, {});
+      assert("인출적정 기본 접힘", htmlFitClosed.indexOf('data-id="payout-fit"') >= 0 &&
+        htmlFitClosed.slice(htmlFitClosed.indexOf('data-id="payout-fit"'), htmlFitClosed.indexOf('data-id="payout-fit"') + 60).indexOf('aria-expanded="true"') < 0);
+      assert("인출적정 월별 안내는 본문에 중복 노출 안 함", htmlFitClosed.indexOf("세무 자문이 아닙니다") < 0 &&
+        htmlFitClosed.indexOf("기간 전체를 한 덩어리로") < 0);
+      var htmlFitOpen = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true }
+      });
+      assert("인출적정 펼침", htmlFitOpen.slice(htmlFitOpen.indexOf('data-id="payout-fit"'), htmlFitOpen.indexOf('data-id="payout-fit"') + 60).indexOf('aria-expanded="true"') >= 0);
+      assert("인출적정 한도·지금·넣어보기", htmlFitOpen.indexOf("가용재원") >= 0 &&
+        htmlFitOpen.indexOf("회사 부담") >= 0 && htmlFitOpen.indexOf(">넣어보기</h4>") >= 0);
+      assert("인출적정 넣어보기 보수 옵션 안내",
+        htmlFitOpen.indexOf("급여 + 인센티브만") >= 0 &&
+        htmlFitOpen.indexOf("급여 + 인센티브 + 수익배분") >= 0 &&
+        htmlFitOpen.indexOf("배당은 필수가 아닙니다") >= 0);
+      assert("인출적정 직접 입력 필드", htmlFitOpen.indexOf('data-payout-fit="monthlySalary.2026"') >= 0 &&
+        htmlFitOpen.indexOf('data-payout-fit="profitSettleOn"') >= 0 &&
+        htmlFitOpen.indexOf('data-payout-fit="dividendOn"') >= 0);
+      assert("인출적정 연도별 급여 입력", htmlFitOpen.indexOf('data-payout-fit="monthlySalary.2026"') >= 0 &&
+        htmlFitOpen.indexOf('data-payout-fit="monthlySalary.2027"') >= 0);
+      assert("인출적정 연도별 배당 율 입력", htmlFitOpen.indexOf('data-payout-fit="dividendRate.2026"') >= 0 &&
+        htmlFitOpen.indexOf('data-payout-fit="dividendRate.2027"') >= 0);
+      assert("인출적정 연도별 배당 계산액", htmlFitOpen.indexOf("payout-fit-amt-div-2026") >= 0 &&
+        htmlFitOpen.indexOf("payout-fit-amt-div-2027") >= 0);
+      var htmlOffPrev = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
+        monthlySalary: fitSeed.current.monthlySalary,
+        profitSettle: fitSeed.current.profitSettle,
+        profitSettleRate: fitSeed.current.profitSettleRate,
+        dividendOn: false,
+        dividendRate: 0.10
+      });
+      if (htmlOffPrev.years[1].dividendPreview > 0) {
+        var taxSlice = htmlFitOpen.slice(htmlFitOpen.indexOf("payout-fit-tax-years"));
+        assert("인출적정 반영안함 하단에 배당 계산액 없음",
+          taxSlice.indexOf(App.Format.formatWon(htmlOffPrev.years[1].dividendPreview)) < 0);
+      }
+      if (htmlOffPrev.payoutTax.years[1].salary.tax > 0) {
+        assert("인출적정 세금 마이너스",
+          htmlFitOpen.indexOf(App.Format.formatWon(-htmlOffPrev.payoutTax.years[1].salary.tax)) >= 0);
+      }
+      assert("인출적정 배당칸 영업이익", htmlFitOpen.indexOf("영업이익") >= 0 &&
+        htmlFitOpen.indexOf('data-payout-fit="dividendRate.2026"') >= 0);
+      assert("인출적정 입력은 설정 경로 아님", htmlFitOpen.indexOf("payout-fit-split") >= 0 &&
+        htmlFitOpen.slice(htmlFitOpen.indexOf("payout-fit-card"), htmlFitOpen.indexOf("payout-fit-card") + 4500)
+          .indexOf('data-path="settings.scenarios.soloAgency.ownerPayout') < 0);
+      assert("인출적정 월·연도별", htmlFitOpen.indexOf("월 급여") >= 0 &&
+        htmlFitOpen.indexOf("payout-fit-year-head") >= 0 &&
+        htmlFitOpen.indexOf("2026") >= 0 && htmlFitOpen.indexOf("2027") >= 0 &&
+        htmlFitOpen.indexOf("수익배분") >= 0 && htmlFitOpen.indexOf("설계함") >= 0 &&
+        htmlFitOpen.indexOf("설계안함") >= 0 && htmlFitOpen.indexOf("배당") >= 0);
+      var splitHtml = htmlFitOpen.slice(htmlFitOpen.indexOf("payout-fit-split"), htmlFitOpen.indexOf("payout-fit-actions"));
+      assert("인출적정 넣어보기 연봉 중복 없음", splitHtml.indexOf("연봉") < 0);
+      assert("인출적정 추천 채우기 버튼", htmlFitOpen.indexOf("payout-fit-from-recommended") >= 0 &&
+        htmlFitOpen.indexOf("추천 값으로") >= 0);
+      assert("인출적정 계산·되돌리기 버튼", htmlFitOpen.indexOf("payout-fit-apply") >= 0 &&
+        htmlFitOpen.indexOf("이 값으로 계산하기") >= 0 &&
+        htmlFitOpen.indexOf("payout-fit-revert") >= 0 &&
+        htmlFitOpen.indexOf("기존값으로 되돌리기") >= 0);
+      assert("인출적정 하단 급여·정산·배당 세금", htmlFitOpen.indexOf("payout-fit-tax-years") >= 0 &&
+        htmlFitOpen.indexOf("payout-fit-tax-one") >= 0 &&
+        htmlFitOpen.indexOf("합계 세후") >= 0 &&
+        htmlFitOpen.indexOf("전체 합계") >= 0 &&
+        htmlFitOpen.indexOf("toggle-payout-fit-tax") >= 0);
+      var taxYearsHtml = htmlFitOpen.slice(htmlFitOpen.indexOf("payout-fit-tax-years"));
+      var taxYearsCut = taxYearsHtml.indexOf("payout-fit-lines");
+      if (taxYearsCut > 0) taxYearsHtml = taxYearsHtml.slice(0, taxYearsCut);
+      assert("인출적정 세금 기본 접힘", taxYearsHtml.indexOf("근로소득세") < 0 &&
+        taxYearsHtml.indexOf("사업소득세") < 0 &&
+        taxYearsHtml.indexOf("배당소득세") < 0 &&
+        taxYearsHtml.indexOf("주민세(근로)") < 0);
+      var htmlFitTaxOpen = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        payoutFitTaxOpen: { salary: true, profitSettle: true, dividend: true }
+      });
+      assert("인출적정 세금 펼침", htmlFitTaxOpen.indexOf("근로소득세") >= 0 &&
+        htmlFitTaxOpen.indexOf("사업소득세") >= 0 &&
+        htmlFitTaxOpen.indexOf("배당소득세") >= 0 &&
+        htmlFitTaxOpen.indexOf("주민세(근로)") >= 0 &&
+        htmlFitTaxOpen.indexOf("주민세(사업)") >= 0 &&
+        htmlFitTaxOpen.indexOf("주민세(배당)") >= 0);
+      assert("인출적정 본문에 도움말 문장 없음", htmlFitOpen.indexOf("세무 자문이 아닙니다") < 0 &&
+        htmlFitOpen.indexOf("기간 전체를 한 덩어리로") < 0);
+      if (fitSeed.verdict === "ok") {
+        assert("인출적정 한도 안 유보 문구", htmlFitOpen.indexOf("회사에 둘 수 있습니다") >= 0);
+      }
+      var htmlFitTyped = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        payoutFitTrial: { salaryInc: fitSeed.poolLimit + 1, profitSettle: 0, profitSettleRate: 0, dividend: 0 }
+      });
+      assert("인출적정 넣어보기 초과 배지", htmlFitTyped.indexOf("한도 초과") >= 0);
+      eq("인출적정 넣어보기 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      var htmlFitHelp = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        payoutFitHelpOpen: true
+      });
+      assert("인출적정 도움말 모달", htmlFitHelp.indexOf("payout-fit-help-title") >= 0 &&
+        htmlFitHelp.indexOf("세무 자문이 아닙니다") >= 0 &&
+        htmlFitHelp.indexOf("급여+인센티브만") >= 0 &&
+        htmlFitHelp.indexOf("이 값으로 계산하기") >= 0);
+      var htmlFitExpand = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: true, cash: true, scenarios: true, glance: true, "payout-fit": true }
+      });
+      assert("인출적정 전체 펴기 후 열림", htmlFitExpand.slice(htmlFitExpand.indexOf('data-id="payout-fit"'), htmlFitExpand.indexOf('data-id="payout-fit"') + 60).indexOf('aria-expanded="true"') >= 0);
+      assert("인출적정 기본 월별은 미리보기 아님", htmlFitExpand.indexOf('data-payout-fit-preview="1"') < 0);
+      var htmlFitDraftOnly = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: true, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        payoutFitTrial: { monthlySalary: 5000000, profitSettle: 0, profitSettleRate: 0, dividend: 0 }
+      });
+      assert("인출적정 입력만으로는 월별 미리보기 안 함", htmlFitDraftOnly.indexOf('data-payout-fit-preview="1"') < 0);
+      var htmlFitPreview = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisTab: "monthly",
+        analysisFoldOpen: { monthly: true, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        ledgerOpen: { payroll: true },
+        payoutFitTrial: { monthlySalary: 5000000, profitSettle: 0, profitSettleRate: 0, dividend: 0 },
+        payoutFitAppliedTrial: { monthlySalary: 5000000, profitSettle: 0, profitSettleRate: 0, dividend: 0 }
+      });
+      var ledgerPreview = htmlFitPreview.slice(
+        htmlFitPreview.indexOf('<table class="ledger'),
+        htmlFitPreview.indexOf("</table>", htmlFitPreview.indexOf('<table class="ledger'))
+      );
+      assert("인출적정 미리보기 월별 표 반영", htmlFitPreview.indexOf('data-payout-fit-preview="1"') >= 0 &&
+        ledgerPreview.indexOf("75,000,000") >= 0);
+      assert("인출적정 미리보기 월별은 원본 3억 아님", ledgerPreview.indexOf("300,000,000") < 0);
+      assert("인출적정 미리보기 안내", htmlFitPreview.indexOf("넣어보기 숫자로 다시 계산") >= 0);
+      var payoutSlice = htmlFitPreview.slice(htmlFitPreview.indexOf("payout-fit-card"));
+      assert("인출적정 지금 칸은 원본 월급여", payoutSlice.indexOf("5,000,000") >= 0);
+      eq("인출적정 미리보기 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      var uiApplyBtn = {
+        payoutFitTrial: { monthlySalary: 5000000, profitSettleOn: true, profitSettleRate: 0.25, dividendOn: false }
+      };
+      App.Render.applyPayoutFitPreview(sFitSeed, rFitSeed, uiApplyBtn);
+      assert("인출적정 계산하기는 적용본을 남김", !!uiApplyBtn.payoutFitAppliedTrial);
+      eq("인출적정 계산하기 후 시드 월급여 불변", App.Engine.findOwnerEmployee(sFitSeed).monthlySalary, 5000000);
+      App.Render.revertPayoutFitPreview(sFitSeed, rFitSeed, uiApplyBtn);
+      assert("인출적정 되돌리면 적용본 없음", !uiApplyBtn.payoutFitAppliedTrial);
+      eq("인출적정 되돌린 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+      var htmlFitDivOn = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        payoutFitTrial: {
+          monthlySalary: fitSeed.current.monthlySalary,
+          profitSettle: 0,
+          profitSettleRate: 0,
+          dividendOn: true,
+          dividendRate: 0.10
+        }
+      });
+      assert("인출적정 반영함이면 율 입력", htmlFitDivOn.indexOf("배당") >= 0 &&
+        htmlFitDivOn.indexOf('data-payout-fit="dividendRate.2026"') >= 0);
+      assert("인출적정 배당칸에 영업이익", htmlFitDivOn.indexOf(">영업이익<") >= 0 ||
+        htmlFitDivOn.indexOf("영업이익") >= 0);
+      var htmlFitSettleOn = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
+        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        payoutFitTrial: {
+          monthlySalary: fitSeed.current.monthlySalary,
+          profitSettleOn: true,
+          profitSettleRate: 0.25,
+          dividendOn: false,
+          dividendRate: 0.10
+        }
+      });
+      assert("인출적정 정산 반영함이면 율 입력", htmlFitSettleOn.indexOf('data-payout-fit="profitSettleRate.2026"') >= 0);
+      assert("인출적정 연도별 정산 율 입력", htmlFitSettleOn.indexOf('data-payout-fit="profitSettleRate.2026"') >= 0 &&
+        htmlFitSettleOn.indexOf('data-payout-fit="profitSettleRate.2027"') >= 0);
+      assert("인출적정 반영함 연도별 배당", htmlFitDivOn.indexOf("배당") >= 0 &&
+        htmlFitDivOn.indexOf('data-payout-fit="dividendRate.2026"') >= 0 &&
+        htmlFitDivOn.indexOf('data-payout-fit="dividendRate.2027"') >= 0);
+      eq("인출적정 반영함 UI 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
+    } catch (e) { fail("대표 인출 적정성 엔진 예외", e.message || e); }
 
     var passed = results.filter(function (x) { return x.ok; }).length;
     var failed = results.filter(function (x) { return !x.ok; }).length;

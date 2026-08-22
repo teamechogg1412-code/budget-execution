@@ -70,8 +70,9 @@
       var vatOutput = App.Money.roundWon((vat.outputByMonth && vat.outputByMonth[month]) || 0);
       var vatSettlement = App.Money.roundWon((vat.settlementByMonth && vat.settlementByMonth[month]) || 0);
 
+      var profitSettle = monthTotal((parts.profitSettle && parts.profitSettle.byMonth) || {}, month);
       var pnlExpense = payroll + insurance + severance + meal + recurring + support + dayBased +
-        projectDirect + projectExpense + lunchTruck + fees + revenueFees + oneTimeOpEx;
+        projectDirect + projectExpense + lunchTruck + fees + revenueFees + oneTimeOpEx + profitSettle;
 
       var row = {
         month: month,
@@ -120,6 +121,7 @@
         vatBalance: App.Money.roundWon((vat.byMonth && vat.byMonth[month] && vat.byMonth[month].balance) || 0),
         dividend: 0,
         profitShare: 0,
+        profitSettle: profitSettle,
         cashOut: 0,
         pnlExpense: pnlExpense,
         closing: 0,
@@ -242,11 +244,7 @@
   }
 
   function applyOwnerProfitShare(state, flows) {
-    var months = (flows || []).map(function (row) { return row.month; });
-    var payout = App.Defaults.resolveOwnerProfitShare
-      ? App.Defaults.resolveOwnerProfitShare(state, months)
-      : { amount: 0, payments: [] };
-    return applyCashPayments(flows, payout.payments || [], "profitShare");
+    return flows;
   }
 
   function calculateMinimumCashBalance(flows) {

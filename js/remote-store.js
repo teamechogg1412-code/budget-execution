@@ -50,9 +50,10 @@
   }
 
   function stateTitle(state) {
+    if (App.Defaults && App.Defaults.budgetDisplayTitle) return App.Defaults.budgetDisplayTitle(state);
     return (state.meta && state.meta.title) ||
-      (state.profile && (state.profile.companyName || state.profile.actorName)) ||
-      "1인 기획사 예산안";
+      (state.profile && state.profile.companyName) ||
+      "배우";
   }
 
   function tableName() {
@@ -79,7 +80,7 @@
       user_id: userId,
       actor_id: state.meta.actorId,
       title: stateTitle(state),
-      actor_name: state.profile.actorName || "",
+      actor_name: (App.Defaults && App.Defaults.actorDisplayName) ? App.Defaults.actorDisplayName() : "배우",
       company_name: state.profile.companyName || "",
       schema_version: state.version || 1,
       state: state,

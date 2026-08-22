@@ -658,6 +658,8 @@
     };
   }
 
+  var DEFAULT_OWNER_DIVIDEND_RATE = 0.10;
+
   function defaultScenarioSettings() {
     return {
       personalTaxCommon: defaultPersonalTaxCommon(),
@@ -674,11 +676,12 @@
             bonusMonth: null,
             dividendMode: "rate",
             dividendAmount: 0,
-            dividendRate: 0.20,
+            dividendRate: DEFAULT_OWNER_DIVIDEND_RATE,
             dividendOn: true,
             dividendMonth: null,
             profitShareWorkRate: 0,
-            profitShareSalesRate: 0
+            profitShareSalesRate: 0,
+            profitShareExpenseRateOverride: null
           },
           personalTax: defaultPersonalTaxSettings("soloAgency")
         },
@@ -839,6 +842,26 @@
     return out;
   }
 
+  function copyYearRatioMap(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    var out = {};
+    var has = false;
+    Object.keys(raw).forEach(function (k) {
+      if (!/^\d{4}$/.test(String(k))) return;
+      out[String(k)] = App.Money.toRatio(raw[k]);
+      has = true;
+    });
+    return has ? out : null;
+  }
+
+  function yearRatioFromMap(map, year, fallback) {
+    if (!map || typeof map !== "object") return fallback;
+    var v = map[year];
+    if (v == null) v = map[String(year)];
+    if (v == null || v === "") return fallback;
+    return App.Money.toRatio(v);
+  }
+
   function ensureScenarioSettings(state) {
     if (!state || typeof state !== "object") return state;
     if (!state.settings || typeof state.settings !== "object") state.settings = {};
@@ -883,7 +906,8 @@
               : App.Money.roundWon(rawOwner.dividendAmount) > 0),
           dividendMonth: App.Month.normalizeMonth(rawOwner.dividendMonth),
           profitShareWorkRate: App.Money.toRatio(rawOwner.profitShareWorkRate),
-          profitShareSalesRate: App.Money.toRatio(rawOwner.profitShareSalesRate)
+          profitShareSalesRate: App.Money.toRatio(rawOwner.profitShareSalesRate),
+          profitShareExpenseRateOverride: normalizeExpenseRateOverride(rawOwner.profitShareExpenseRateOverride)
         },
         personalTax: soloTax
       },
@@ -900,6 +924,10 @@
         personalTax: exTax
       }
     };
+    var shareByYear = copyYearRatioMap(rawOwner.profitShareRateByYear);
+    var divByYear = copyYearRatioMap(rawOwner.dividendRateByYear);
+    if (shareByYear) state.settings.scenarios.soloAgency.ownerPayout.profitShareRateByYear = shareByYear;
+    if (divByYear) state.settings.scenarios.soloAgency.ownerPayout.dividendRateByYear = divByYear;
     delete state.settings.analysisMode;
     delete state.settings.splitBasis;
     delete state.settings.scenarios.soloAgency.enabled;
@@ -938,6 +966,37 @@
 
   function ownerProfitShareWithholding(amount) {
     return withholdingAt(amount, 0.03, 0.033, "사업소득세 (3.3%)", "business");
+  }
+
+  var ACTOR_BUSINESS_CODE = "940302";
+
+  function normalizeExpenseRateOverride(raw) {
+    if (raw === null || raw === undefined || raw === "") return null;
+    var ratio = App.Money.toRatio(raw);
+    if (!isFinite(ratio) || ratio < 0) return null;
+    return ratio > 1 ? 1 : ratio;
+  }
+
+  function resolvedProfitShareExpenseRate(state, year) {
+    var payout = (((state && state.settings) || {}).scenarios || {}).soloAgency &&
+      state.settings.scenarios.soloAgency.ownerPayout;
+    payout = payout || {};
+    var official = App.PersonalTax.getBusinessExpenseRate(year, ACTOR_BUSINESS_CODE);
+    var officialRate = official ? official.simpleRate : null;
+    var override = normalizeExpenseRateOverride(payout.profitShareExpenseRateOverride);
+    var isOverride = override !== null;
+    var appliedRate = isOverride ? override : (officialRate != null ? officialRate : 0);
+    return {
+      businessCode: ACTOR_BUSINESS_CODE,
+      businessName: official ? official.businessName : "배우·탤런트 등",
+      taxYear: Number(year),
+      officialRate: officialRate,
+      overrideRate: override,
+      appliedRate: appliedRate,
+      isOverride: isOverride,
+      source: official ? official.source : null,
+      missing: !official
+    };
   }
 
   function isDividendOn(payout) {
@@ -1017,12 +1076,13 @@
           var row = (byYear && (byYear[year] || byYear[String(year)])) || {};
           var op = yearOperatingProfit(row, years.length === 1 ? ctx.operatingProfit : 0);
           var base = op > 0 ? op : 0;
-          var amount = App.Money.roundWon(base * rate);
+          var yearRate = yearRatioFromMap(payout.dividendRateByYear, year, rate);
+          var amount = App.Money.roundWon(base * yearRate);
           var month = clampMonthToPeriod(nextMarchMonth(year), list);
           yearRows.push({
             year: year,
             operatingProfit: op,
-            rate: rate,
+            rate: yearRate,
             amount: amount,
             taxRate: taxParts.rate,
             taxLabel: taxParts.label,
@@ -1102,7 +1162,7 @@
     payout.dividendOn = !!on;
     if (on && payout.dividendMode !== "amount") payout.dividendMode = "rate";
     if (on && payout.dividendMode === "rate" && !App.Money.toRatio(payout.dividendRate)) {
-      payout.dividendRate = 0.20;
+      payout.dividendRate = DEFAULT_OWNER_DIVIDEND_RATE;
     }
     return state;
   }
@@ -1138,25 +1198,65 @@
     var workRate = App.Money.toRatio(payout.profitShareWorkRate);
     var salesRate = App.Money.toRatio(payout.profitShareSalesRate);
     var list = monthIdList(months);
-    var byYear = workSalesRevenueByYear(state, list);
-    var years = dividendYearsFrom(list, byYear);
+    var inPeriod = {};
+    list.forEach(function (m) { inPeriod[m] = true; });
+    var byMonth = {};
+    list.forEach(function (m) { byMonth[m] = { total: 0, items: [] }; });
+    var projectItems = [];
     var workRevenue = 0;
     var salesRevenue = 0;
+    var workAmount = 0;
+    var salesAmount = 0;
+    (state.projects || []).forEach(function (p) {
+      if (!p || p.status === "cancelled") return;
+      var kind = isSalesCategory(p.category) ? "sales" : "work";
+      var baseRate = kind === "sales" ? salesRate : workRate;
+      (p.payments || []).forEach(function (pay, idx) {
+        var month = App.Month.normalizeMonth(pay.expectedMonth || pay.month);
+        if (!month || !inPeriod[month]) return;
+        var amt = App.Engine && App.Engine.resolvePaymentAmount
+          ? App.Engine.resolvePaymentAmount(p, pay)
+          : App.Money.roundWon(pay.amount);
+        amt = App.Money.roundWon(Math.max(0, amt));
+        if (kind === "sales") salesRevenue = App.Money.roundWon(salesRevenue + amt);
+        else workRevenue = App.Money.roundWon(workRevenue + amt);
+        var year = App.TaxYear ? App.TaxYear.yearOf(month) : Number(String(month).slice(0, 4));
+        var rate = yearRatioFromMap(payout.profitShareRateByYear, year, baseRate);
+        var share = App.Money.roundWon(amt * rate);
+        if (!share) return;
+        var item = {
+          id: "ps-" + (p.id || "p") + "-" + idx,
+          projectId: p.id,
+          name: p.name || "프로젝트",
+          month: month,
+          amount: share,
+          kind: kind,
+          rate: rate
+        };
+        projectItems.push(item);
+        if (kind === "sales") salesAmount = App.Money.roundWon(salesAmount + share);
+        else workAmount = App.Money.roundWon(workAmount + share);
+        if (!byMonth[month]) byMonth[month] = { total: 0, items: [] };
+        byMonth[month].items.push(item);
+        byMonth[month].total = App.Money.roundWon(byMonth[month].total + share);
+      });
+    });
     var workPayments = [];
     var salesPayments = [];
-    years.forEach(function (year) {
-      var y = byYear[year] || { work: 0, sales: 0 };
-      workRevenue = App.Money.roundWon(workRevenue + y.work);
-      salesRevenue = App.Money.roundWon(salesRevenue + y.sales);
-      var month = clampMonthToPeriod(nextMarchMonth(year), list);
-      var workAmt = App.Money.roundWon(Math.max(0, y.work) * workRate);
-      var salesAmt = App.Money.roundWon(Math.max(0, y.sales) * salesRate);
+    Object.keys(byMonth).forEach(function (month) {
+      var workAmt = 0;
+      var salesAmt = 0;
+      (byMonth[month].items || []).forEach(function (it) {
+        if (it.kind === "sales") salesAmt += it.amount;
+        else workAmt += it.amount;
+      });
+      workAmt = App.Money.roundWon(workAmt);
+      salesAmt = App.Money.roundWon(salesAmt);
+      var year = App.TaxYear ? App.TaxYear.yearOf(month) : Number(String(month).slice(0, 4));
       if (workAmt) workPayments.push({ sourceYear: year, amount: workAmt, month: month });
       if (salesAmt) salesPayments.push({ sourceYear: year, amount: salesAmt, month: month });
     });
     var payments = mergeDividendPayments(workPayments.concat(salesPayments));
-    var workAmount = App.Money.roundWon(Math.max(0, workRevenue) * workRate);
-    var salesAmount = App.Money.roundWon(Math.max(0, salesRevenue) * salesRate);
     var total = App.Money.roundWon(payments.reduce(function (sum, p) { return sum + p.amount; }, 0));
     return {
       workRevenue: workRevenue,
@@ -1167,6 +1267,8 @@
       salesAmount: salesAmount,
       workPayments: workPayments,
       salesPayments: salesPayments,
+      projectItems: projectItems,
+      byMonth: byMonth,
       amount: total,
       payments: payments,
       tax: ownerProfitShareWithholding(total)
@@ -2029,14 +2131,50 @@
     return state;
   }
 
+  var GENERIC_ACTOR_LABEL = "배우";
+  var REAL_ACTOR_NAME = "이종원";
+
+  function actorDisplayName() {
+    return GENERIC_ACTOR_LABEL;
+  }
+
+  function isRealActorName(name) {
+    return String(name || "").trim() === REAL_ACTOR_NAME;
+  }
+
+  function displayBudgetName(name) {
+    var title = String(name || "").trim();
+    return (!title || isRealActorName(title)) ? GENERIC_ACTOR_LABEL : title;
+  }
+
+  function budgetDisplayTitle(state) {
+    var title = state && state.meta && String(state.meta.title || "").trim();
+    if (title && !isRealActorName(title)) return title;
+    var company = state && state.profile && String(state.profile.companyName || "").trim();
+    if (company) return company;
+    return GENERIC_ACTOR_LABEL;
+  }
+
+  function anonymizeActorIdentity(state) {
+    if (!state || typeof state !== "object") return state;
+    if (state.profile && isRealActorName(state.profile.actorName)) {
+      state.profile.actorName = GENERIC_ACTOR_LABEL;
+    }
+    if (state.meta && isRealActorName(state.meta.title)) {
+      state.meta.title = GENERIC_ACTOR_LABEL;
+    }
+    return state;
+  }
+
   function ensureMeta(state) {
     if (!state || typeof state !== "object") return state;
     if (!state.meta || typeof state.meta !== "object") state.meta = {};
+    anonymizeActorIdentity(state);
     var meta = state.meta;
     if (!meta.actorId) meta.actorId = uid();
     if (!meta.budgetId) meta.budgetId = uid();
     if (!meta.title) {
-      meta.title = (state.profile && (state.profile.companyName || state.profile.actorName)) || "1인 기획사 예산안";
+      meta.title = (state.profile && state.profile.companyName) || GENERIC_ACTOR_LABEL;
     }
     if (!meta.storageMode) meta.storageMode = "local";
     if (!meta.createdAt) meta.createdAt = new Date().toISOString();
@@ -2716,18 +2854,25 @@
     appearanceOccurrenceCount: appearanceOccurrenceCount,
     resolvedExpenseRate: resolvedExpenseRate,
     ensureState: ensureState,
+    actorDisplayName: actorDisplayName,
+    displayBudgetName: displayBudgetName,
+    budgetDisplayTitle: budgetDisplayTitle,
     ensureTaxSettings: ensureTaxSettings,
     ensureInsuranceRates: ensureInsuranceRates,
     followsSimStartMonth: followsSimStartMonth,
     ensureScenarioSettings: ensureScenarioSettings,
     resolveOwnerDividend: resolveOwnerDividend,
+    defaultOwnerDividendRate: DEFAULT_OWNER_DIVIDEND_RATE,
     setOwnerDividendMode: setOwnerDividendMode,
     setOwnerDividendOn: setOwnerDividendOn,
     isDividendOn: isDividendOn,
     ownerDividendForMonth: ownerDividendForMonth,
     ownerDividendWithholding: ownerDividendWithholding,
     ownerProfitShareWithholding: ownerProfitShareWithholding,
+    resolvedProfitShareExpenseRate: resolvedProfitShareExpenseRate,
+    ACTOR_BUSINESS_CODE: ACTOR_BUSINESS_CODE,
     resolveOwnerProfitShare: resolveOwnerProfitShare,
+    workSalesRevenueByYear: workSalesRevenueByYear,
     normalizePersonalTax: normalizePersonalTax,
     normalizePersonalTaxCommon: normalizePersonalTaxCommon,
     defaultPersonalTaxSettings: defaultPersonalTaxSettings,

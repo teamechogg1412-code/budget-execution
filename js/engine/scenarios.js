@@ -154,7 +154,7 @@
     return out;
   }
 
-  function calculateSoloPersonalTaxDetail(state, soloResult, salaryEmployeeId, salary, bonus, dividend, actorGross, settings) {
+  function calculateSoloPersonalTaxDetail(state, soloResult, salaryEmployeeId, salary, bonus, dividend, actorGross, settings, profitSharePayments) {
     settings = settings && typeof settings === "object" ? settings : {};
     if (settings.mode !== "auto") return App.Engine.calculateScenarioPersonalTaxDetail(actorGross, settings);
     var fallbackYear = Number(settings.year) || 2026;
@@ -165,6 +165,10 @@
     });
     if (!Object.keys(salaryYears).length && salary) addToYearBucket(buckets, fallbackYear, "earnedGross", salary);
     if (bonus) addToYearBucket(buckets, monthYear(state.settings.scenarios.soloAgency.ownerPayout.bonusMonth, fallbackYear), "earnedGross", bonus);
+    (profitSharePayments || []).forEach(function (p) {
+      if (!p || !p.amount) return;
+      addToYearBucket(buckets, monthYear(p.month, fallbackYear), "businessIncome", p.amount);
+    });
     var details = Object.keys(buckets).sort().map(function (year) {
       var b = buckets[year];
       var gross = App.Money.roundWon(b.earnedGross + b.businessIncome + b.otherIncome);
@@ -172,7 +176,14 @@
       yearSettings.year = Number(year);
       yearSettings.prepaidTax = 0;
       yearSettings.withholdingTax = 0;
-      return App.Engine.calculatePersonalTaxDetail(gross, yearSettings);
+      var rateInfo = null;
+      if (b.businessIncome && App.Defaults.resolvedProfitShareExpenseRate) {
+        rateInfo = App.Defaults.resolvedProfitShareExpenseRate(state, Number(year));
+        yearSettings.necessaryExpenses = App.Money.roundWon(b.businessIncome * App.Money.toRatio(rateInfo.appliedRate));
+      }
+      var detail = App.Engine.calculatePersonalTaxDetail(gross, yearSettings);
+      if (rateInfo) detail.businessExpenseRateInfo = rateInfo;
+      return detail;
     });
     return aggregateTaxDetails(details, settings);
   }
@@ -221,8 +232,12 @@
     var autoMode = (taxSettings.mode || "auto") === "auto";
     var taxDetail = calculateSoloPersonalTaxDetail(
       state, soloResult, payout.salaryEmployeeId, salary, bonus, 0,
-      autoMode ? earnedGross : actorGross, taxSettings
+      autoMode ? earnedGross : actorGross, taxSettings,
+      autoMode ? profitSharePayments : null
     );
+    if (profitShare && autoMode) {
+      taxDetail.profitShareTaxLabel = profitShareTaxParts.label;
+    }
     if (dividend && autoMode) {
       taxDetail.otherIncome = App.Money.roundWon((taxDetail.otherIncome || 0) + dividend);
       taxDetail.payoutTaxLabel = dividendTaxParts.label;
@@ -249,39 +264,6 @@
         yearRow.dividendTax = App.Money.roundWon((yearRow.dividendTax || 0) + parts.total);
         yearRow.payoutTaxLabel = parts.label;
         yearRow.payoutIncomeLabel = "대표 배당";
-        yearRow.totalPersonalTax = App.Money.roundWon(yearRow.totalPersonalTax + parts.total);
-        yearRow.afterTaxIncome = App.Money.roundWon(
-          App.Money.roundWon(yearRow.earnedGross + yearRow.businessIncome + yearRow.otherIncome) -
-          yearRow.totalPersonalTax
-        );
-      });
-    }
-    if (profitShare && autoMode) {
-      taxDetail.businessIncome = App.Money.roundWon((taxDetail.businessIncome || 0) + profitShare);
-      taxDetail.profitShareTaxLabel = profitShareTaxParts.label;
-      taxDetail.totalPersonalTax = App.Money.roundWon(taxDetail.totalPersonalTax + profitShareTaxParts.total);
-      taxDetail.afterTaxIncome = App.Money.roundWon(
-        App.Money.roundWon(taxDetail.earnedGross + taxDetail.businessIncome + taxDetail.otherIncome) -
-        taxDetail.totalPersonalTax
-      );
-      profitSharePayments.forEach(function (p) {
-        if (!p.amount) return;
-        var parts = App.Defaults.ownerProfitShareWithholding
-          ? App.Defaults.ownerProfitShareWithholding(p.amount)
-          : { total: 0, label: "사업소득세 (3.3%)" };
-        var shareYear = monthYear(p.month, Number(taxSettings.year) || 2026);
-        var yearRow = ((taxDetail.years || []).filter(function (d) { return Number(d.year) === Number(shareYear); })[0]) || null;
-        if (!yearRow) {
-          yearRow = App.Engine.calculatePersonalTaxDetail(0, {
-            mode: "auto", year: shareYear, useLinkedIncome: true, incomeType: "earned"
-          });
-          taxDetail.years = (taxDetail.years || []).concat([yearRow]).sort(function (a, b) {
-            return Number(a.year) - Number(b.year);
-          });
-        }
-        yearRow.businessIncome = App.Money.roundWon((yearRow.businessIncome || 0) + p.amount);
-        yearRow.profitShareTax = App.Money.roundWon((yearRow.profitShareTax || 0) + parts.total);
-        yearRow.profitShareTaxLabel = parts.label;
         yearRow.totalPersonalTax = App.Money.roundWon(yearRow.totalPersonalTax + parts.total);
         yearRow.afterTaxIncome = App.Money.roundWon(
           App.Money.roundWon(yearRow.earnedGross + yearRow.businessIncome + yearRow.otherIncome) -
@@ -404,7 +386,7 @@
       pendingCorporateLocal: pendingCorporateLocal,
       corporateCashForEconomicValue: corporateCashForEconomicValue,
       corporateAfterTaxNet: corporateAfterTaxNet,
-      controlledEconomicValue: App.Money.roundWon(actorNet + corporateAfterTaxNet - dividend - profitShare + uniqueBenefitValue),
+      controlledEconomicValue: App.Money.roundWon(actorNet + corporateAfterTaxNet - dividend + uniqueBenefitValue),
       liquidationTaxRate: liquidationTaxRate,
       pendingTaxLiability: pendingTaxLiability,
       corpCashAfterPendingTax: corpCashAfterPendingTax,
@@ -809,6 +791,10 @@
     return out;
   }
 
+  App.Engine.ledgerRowById = ledgerRowById;
+  App.Engine.ownerSalaryFromLedger = ownerSalaryFromLedger;
+  App.Engine.ownerPayrollRowsFromLedger = ownerPayrollRowsFromLedger;
+  App.Engine.findOwnerEmployee = findOwnerEmployee;
   App.Engine.exclusiveCostBuckets = exclusiveCostBuckets;
   App.Engine.exclusiveYearSlices = exclusiveYearSlices;
   App.Engine.splitEmployeesByBurden = splitEmployeesByBurden;

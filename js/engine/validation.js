@@ -77,9 +77,9 @@
 
     var cogsLedger = ledgerSubtotal(ledger, "cogs-total");
     if (cogsLedger != null) {
-      pushCheck(errors, "costOfSales", "매출원가(프로젝트 진행비+에이전시 수수료)",
-        -amt(amt(kpis.projectDirect) + amt(kpis.agencyFees)), cogsLedger,
-        "엔진 kpis.projectDirect + kpis.agencyFees", "분석 > 월별 분석 > 매출원가 합계");
+      pushCheck(errors, "costOfSales", "매출원가(프로젝트 진행비+에이전시 수수료+수익정산)",
+        -amt(amt(kpis.projectDirect) + amt(kpis.agencyFees) + amt(kpis.profitShare)), cogsLedger,
+        "엔진 kpis.projectDirect + kpis.agencyFees + kpis.profitShare", "분석 > 월별 분석 > 매출원가 합계");
     }
 
     var payrollLedger = ledgerSubtotal(ledger, "payroll");

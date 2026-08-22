@@ -7,7 +7,7 @@
 
   var state = seedState();
   var result = null;
-    var ui = { view: "dashboard", selectedMonth: null, savedAt: null, loadError: false, savedLoadOpen: false, rateOpen: {}, costTab: "opex", rent2fTab: "included", analysisTab: "scenarios", simTab: "basics", supportOpen: {}, costSecOpen: {}, costItemOpen: {}, planEditId: null, planPayOpen: {}, workOpen: {}, workItemOpen: {}, ledgerOpen: {}, ledgerYearOpen: {}, budgetPanelOpen: false, moreMenuOpen: false, personalTaxScenario: "", taxFoldOpen: {}, revenueRateHelpOpen: false, ledgerHelpOpen: false, scenarioCorpHelpOpen: false, scenarioSoloPersonHelpOpen: false, scenarioExPersonHelpOpen: false, analysisTaxHelpOpen: false, analysisConsistencyOpen: false, revenueDraft: null, revenueDraftSourceId: null };
+    var ui = { view: "dashboard", selectedMonth: null, savedAt: null, loadError: false, savedLoadOpen: false, rateOpen: {}, costTab: "opex", rent2fTab: "included", analysisTab: "scenarios", simTab: "basics", supportOpen: {}, costSecOpen: {}, costItemOpen: {}, planEditId: null, planPayOpen: {}, workOpen: {}, workItemOpen: {}, ledgerOpen: {}, ledgerYearOpen: {}, budgetPanelOpen: false, moreMenuOpen: false, personalTaxScenario: "", taxFoldOpen: {}, settingsFoldOpen: {}, revenueRateHelpOpen: false, ledgerHelpOpen: false, multiplierHelpOpen: false, scenarioCompareHelpOpen: false, scenarioCorpHelpOpen: false, scenarioSoloPersonHelpOpen: false, scenarioExPersonHelpOpen: false, analysisTaxHelpOpen: false, analysisConsistencyOpen: false, revenueDraft: null, revenueDraftSourceId: null };
   var saveTimer = null;
 
   function getByPath(obj, path) {
@@ -116,8 +116,14 @@
       kpisEl.hidden = true;
     }
     if (top) top.classList.toggle("is-dashboard", onDash);
+    if (ui.savedLoadOpen) {
+      document.getElementById("sub").textContent = "조건 입력 → 현금흐름 자동 계산";
+      var switcher = document.getElementById("budget-switcher");
+      if (switcher) switcher.innerHTML = "";
+      return;
+    }
     var sub = [];
-    if (state.profile.actorName) sub.push(state.profile.actorName);
+    sub.push((App.Defaults && App.Defaults.actorDisplayName) ? App.Defaults.actorDisplayName() : "배우");
     if (state.profile.companyName) sub.push(state.profile.companyName);
     sub.push(App.Month.monthLabel(state.profile.startMonth) + " – " + App.Month.monthLabel(state.profile.endMonth));
     document.getElementById("sub").textContent = sub.join(" · ");
@@ -125,11 +131,27 @@
     syncSetupStickyTop();
   }
 
-  var SAVED_LOAD_KEY = "solo-agency-budget:saved-load-done";
+  var UNLOCK_KEY = "solo-agency-budget:gate-ok";
 
   function markSavedLoadDone() {
     ui.savedLoadOpen = false;
-    try { sessionStorage.setItem(SAVED_LOAD_KEY, "1"); } catch (err) {}
+    ui.unlockError = false;
+    try { sessionStorage.setItem(UNLOCK_KEY, "1"); } catch (err) {}
+  }
+
+  function unlockFromGate() {
+    var input = document.querySelector("[data-unlock-password]");
+    var value = input ? input.value : "";
+    if (!App.Access || !App.Access.check(value)) {
+      ui.unlockError = true;
+      renderMain();
+      return;
+    }
+    markSavedLoadDone();
+    ui.view = "dashboard";
+    if (App.Telegram && App.Telegram.notifyAccessOnce) App.Telegram.notifyAccessOnce();
+    refreshSticky();
+    renderMain();
   }
 
   function applyCanonicalSeed() {
@@ -162,15 +184,46 @@
     document.documentElement.style.setProperty("--setup-sticky-top", h + "px");
   }
 
+  function fitOneLine(el, maxPx, minPx) {
+    if (!el) return;
+    el.style.fontSize = "";
+    var size = maxPx;
+    el.style.fontSize = size + "px";
+    var n = 0;
+    while (n++ < 16 && size > minPx && el.scrollWidth > el.clientWidth + 1) {
+      size -= 0.5;
+      el.style.fontSize = size + "px";
+    }
+  }
+
+  function fitCostItemNames() {
+    var mobile = false;
+    try { mobile = window.matchMedia("(max-width: 960px)").matches; } catch (err) {}
+    var nodes = document.querySelectorAll(".view-costs .cost-name, .view-simulation .cost-name");
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i].querySelector(".cost-name-text") || nodes[i];
+      el.style.fontSize = "";
+      if (!mobile) continue;
+      fitOneLine(el, 13, 9);
+    }
+    var feeAmts = document.querySelectorAll('[data-computed="fee-amount"], [data-computed="fee-grand"]');
+    for (var j = 0; j < feeAmts.length; j++) fitOneLine(feeAmts[j], 14, 10);
+  }
+
   function renderMain(opts) {
     var keepScroll = opts && opts.keepLedgerScroll;
     var scroller = keepScroll ? document.querySelector(".ledger-scroll") : null;
     var pos = scroller ? { left: scroller.scrollLeft, top: scroller.scrollTop } : null;
     document.getElementById("view").innerHTML = App.Render.renderView(ui.view, state, result, ui);
+    document.body.classList.toggle("is-locked", !!ui.savedLoadOpen);
     document.querySelectorAll(".nav button").forEach(function (btn) {
       btn.classList.toggle("active", btn.getAttribute("data-view") === ui.view);
     });
     syncSetupStickyTop();
+    if (ui.savedLoadOpen) {
+      var pw = document.querySelector("[data-unlock-password]");
+      if (pw) pw.focus();
+    }
     if (pos) {
       var next = document.querySelector(".ledger-scroll");
       if (next) {
@@ -178,9 +231,34 @@
         next.scrollTop = pos.top;
       }
     }
+    fitCostItemNames();
   }
 
-    function afterChange(rerender) {
+  function restorePayoutFitFocus(key, fromEnd) {
+    var next = document.querySelector('[data-payout-fit="' + key + '"]');
+    if (key === "dividendOn" || key === "profitSettleOn") {
+      var checked = document.querySelector('[data-payout-fit="' + key + '"]:checked');
+      if (checked) next = checked;
+    }
+    if (!next) return;
+    next.focus();
+    try {
+      var pos = Math.max(0, String(next.value || "").length - fromEnd);
+      next.setSelectionRange(pos, pos);
+    } catch (err) {}
+  }
+
+  function refreshPayoutFitPreview(el) {
+    var key = el.getAttribute("data-payout-fit");
+    App.Render.applyPayoutFitDraft(state, result, ui, key, parseValue(el));
+    if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
+    ui.analysisFoldOpen["payout-fit"] = true;
+    var fromEnd = String(el.value || "").length - (el.selectionStart || 0);
+    renderMain({ keepLedgerScroll: true });
+    restorePayoutFitFocus(key, fromEnd);
+  }
+
+  function afterChange(rerender) {
     recompute();
     refreshSticky();
     patchComputed();
@@ -285,9 +363,9 @@
   }
 
   var HELP_FLAGS = [
-    "revenueRateHelpOpen", "ledgerHelpOpen",
+    "revenueRateHelpOpen", "ledgerHelpOpen", "multiplierHelpOpen", "scenarioCompareHelpOpen",
     "scenarioCorpHelpOpen", "scenarioSoloPersonHelpOpen", "scenarioExPersonHelpOpen",
-    "analysisTaxHelpOpen"
+    "analysisTaxHelpOpen", "liqHelpOpen", "payoutFitHelpOpen"
   ];
 
   function anyHelpOpen() {
@@ -302,6 +380,10 @@
     document.body.addEventListener("input", function (e) {
       var el = e.target;
       formatMoneyField(el, false);
+      if (el.getAttribute("data-payout-fit")) {
+        refreshPayoutFitPreview(el);
+        return;
+      }
       if (!el.getAttribute("data-path")) return;
       applyField(el, false);
     });
@@ -326,6 +408,10 @@
       }
       if (el.getAttribute("data-plan-add-cat") != null) {
         ui.planAddCategory = el.value;
+        return;
+      }
+      if (el.getAttribute("data-payout-fit")) {
+        refreshPayoutFitPreview(el);
         return;
       }
       if (!el.getAttribute("data-path")) return;
@@ -363,6 +449,12 @@
       handleAction(btn);
     });
     document.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && e.target && e.target.getAttribute &&
+          e.target.getAttribute("data-unlock-password") != null) {
+        e.preventDefault();
+        unlockFromGate();
+        return;
+      }
       if (e.key !== "Escape") return;
       var closed = false;
       if (ui.moreMenuOpen) { setMoreMenuOpen(false); closed = true; }
@@ -401,6 +493,10 @@
         if (!ui.taxFoldOpen) ui.taxFoldOpen = {};
         ui.taxFoldOpen[e.target.getAttribute("data-tax-fold")] = !!e.target.open;
       }
+      if (e.target && e.target.getAttribute && e.target.getAttribute("data-settings-fold")) {
+        if (!ui.settingsFoldOpen) ui.settingsFoldOpen = {};
+        ui.settingsFoldOpen[e.target.getAttribute("data-settings-fold")] = !!e.target.open;
+      }
     }, true);
     document.getElementById("import-file").addEventListener("change", function (e) {
       var file = e.target.files && e.target.files[0];
@@ -418,7 +514,10 @@
       reader.readAsText(file, "utf-8");
       e.target.value = "";
     });
-    window.addEventListener("resize", syncSetupStickyTop);
+    window.addEventListener("resize", function () {
+      syncSetupStickyTop();
+      fitCostItemNames();
+    });
     if (window.ResizeObserver) {
       var header = document.querySelector(".top");
       if (header) new ResizeObserver(syncSetupStickyTop).observe(header);
@@ -701,11 +800,12 @@
     var tab = ui.analysisTab || "compare";
     if (tab === "monthly") return id === "monthly" || id === "cash";
     if (tab === "income-tax") return id === "glance";
-    return id === "scenarios" || id === "cash";
+    return id === "monthly";
   }
 
   function handleAction(btn) {
     var action = btn.getAttribute("data-action");
+    if (ui.savedLoadOpen && action !== "unlock-app") return;
     var index = Number(btn.getAttribute("data-index"));
     var start = state.profile.startMonth;
 
@@ -750,6 +850,96 @@
     }
     if (action === "close-ledger-help") {
       ui.ledgerHelpOpen = false;
+      renderMain();
+      return;
+    }
+    if (action === "open-multiplier-help") {
+      closeAllHelp();
+      ui.multiplierHelpOpen = true;
+      renderMain();
+      var multClose = document.querySelector(".app-modal-x");
+      if (multClose) multClose.focus();
+      return;
+    }
+    if (action === "close-multiplier-help") {
+      ui.multiplierHelpOpen = false;
+      renderMain();
+      return;
+    }
+    if (action === "open-scenario-compare-help") {
+      closeAllHelp();
+      ui.scenarioCompareHelpOpen = true;
+      renderMain();
+      var compareHelpClose = document.querySelector(".app-modal-x");
+      if (compareHelpClose) compareHelpClose.focus();
+      return;
+    }
+    if (action === "close-scenario-compare-help") {
+      ui.scenarioCompareHelpOpen = false;
+      renderMain();
+      return;
+    }
+    if (action === "open-payout-fit-help") {
+      closeAllHelp();
+      ui.payoutFitHelpOpen = true;
+      renderMain();
+      var payoutFitHelpClose = document.querySelector(".app-modal-x");
+      if (payoutFitHelpClose) payoutFitHelpClose.focus();
+      return;
+    }
+    if (action === "close-payout-fit-help") {
+      ui.payoutFitHelpOpen = false;
+      renderMain();
+      return;
+    }
+    if (action === "payout-fit-apply") {
+      App.Render.applyPayoutFitPreview(state, result, ui);
+      if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
+      ui.analysisFoldOpen["payout-fit"] = true;
+      ui.analysisFoldOpen.monthly = true;
+      ui.analysisFoldOpen.cash = true;
+      renderMain();
+      return;
+    }
+    if (action === "payout-fit-revert") {
+      App.Render.revertPayoutFitPreview(state, result, ui);
+      if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
+      ui.analysisFoldOpen["payout-fit"] = true;
+      renderMain();
+      return;
+    }
+    if (action === "payout-fit-from-recommended") {
+      App.Render.fillPayoutFitTrial(state, result, ui, "recommended");
+      if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
+      ui.analysisFoldOpen["payout-fit"] = true;
+      renderMain();
+      return;
+    }
+    if (action === "toggle-payout-fit-tax") {
+      var taxId = btn.getAttribute("data-id");
+      if (!taxId) return;
+      if (!ui.payoutFitTaxOpen) ui.payoutFitTaxOpen = {};
+      ui.payoutFitTaxOpen[taxId] = !ui.payoutFitTaxOpen[taxId];
+      if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
+      ui.analysisFoldOpen["payout-fit"] = true;
+      renderMain();
+      return;
+    }
+    if (action === "open-liq-help") {
+      closeAllHelp();
+      ui.liqHelpOpen = true;
+      renderMain();
+      var liqClose = document.querySelector(".app-modal-x");
+      if (liqClose) liqClose.focus();
+      return;
+    }
+    if (action === "close-liq-help") {
+      ui.liqHelpOpen = false;
+      renderMain();
+      return;
+    }
+    if (action === "reset-profit-share-expense-rate") {
+      state.settings.scenarios.soloAgency.ownerPayout.profitShareExpenseRateOverride = null;
       renderMain();
       return;
     }
@@ -832,15 +1022,14 @@
       refreshSticky();
       return;
     }
+    if (action === "unlock-app") {
+      unlockFromGate();
+      return;
+    }
     if (action === "load-saved") {
       applyCanonicalSeed();
       markSavedLoadDone();
       afterChange(true);
-      return;
-    }
-    if (action === "dismiss-saved-load") {
-      markSavedLoadDone();
-      renderMain();
       return;
     }
     if (action === "reset") {
@@ -874,7 +1063,7 @@
       return;
     }
     if (action === "new-budget-copy") {
-      var copyName = prompt("복제할 예산안 이름", ((state.meta && state.meta.title) || "예산안") + " 복사본");
+      var copyName = prompt("복제할 예산안 이름", (App.Defaults.budgetDisplayTitle(state) || "예산안") + " 복사본");
       if (copyName === null) return;
       flushSave();
       var copyId = App.Store.createBudget(copyName || "예산안 복사본", { fromState: state });
@@ -884,7 +1073,7 @@
     if (action === "rename-budget") {
       var renameId = btn.getAttribute("data-id");
       var current = (App.Store.listBudgets() || []).filter(function (b) { return b.id === renameId; })[0];
-      var renamed = prompt("예산안 이름", (current && current.name) || "");
+      var renamed = prompt("예산안 이름", (current && App.Defaults.displayBudgetName(current.name)) || "배우");
       if (!renamed) return;
       App.Store.renameBudget(renameId, renamed);
       if (renameId === App.Store.getActiveBudgetId() && state.meta) {
@@ -897,7 +1086,7 @@
     if (action === "duplicate-budget") {
       var dupId = btn.getAttribute("data-id");
       var dupSrc = (App.Store.listBudgets() || []).filter(function (b) { return b.id === dupId; })[0];
-      var dupName = prompt("복제본 이름", ((dupSrc && dupSrc.name) || "예산안") + " 복사본");
+      var dupName = prompt("복제본 이름", ((dupSrc && App.Defaults.displayBudgetName(dupSrc.name)) || "예산안") + " 복사본");
       if (dupName === null) return;
       if (dupId === App.Store.getActiveBudgetId()) flushSave();
       App.Store.duplicateBudget(dupId, dupName || undefined);
@@ -976,7 +1165,8 @@
           monthly: analysisFoldOpenFromUi("monthly"),
           cash: analysisFoldOpenFromUi("cash"),
           scenarios: analysisFoldOpenFromUi("scenarios"),
-          glance: analysisFoldOpenFromUi("glance")
+          glance: analysisFoldOpenFromUi("glance"),
+          "payout-fit": analysisFoldOpenFromUi("payout-fit")
         };
       }
       ui.analysisFoldOpen[foldId] = !ui.analysisFoldOpen[foldId];
@@ -990,7 +1180,8 @@
         monthly: foldOn,
         cash: foldOn,
         scenarios: foldOn,
-        glance: foldOn
+        glance: foldOn,
+        "payout-fit": foldOn
       };
       if (ui.analysisTab === "revenue-floor") ui.analysisTab = "compare";
       renderMain();
@@ -1010,6 +1201,8 @@
     if (action === "goto-org-staff") {
       ui.view = "simulation";
       ui.simTab = "org";
+      if (!ui.settingsFoldOpen) ui.settingsFoldOpen = {};
+      ui.settingsFoldOpen["org-payroll"] = true;
       renderMain();
       refreshSticky();
       return;
@@ -1057,6 +1250,10 @@
     }
     if (action === "toggle-solo-tax-edit") {
       ui.soloTaxFormEdit = !ui.soloTaxFormEdit;
+      if (ui.soloTaxFormEdit) {
+        if (!ui.taxFoldOpen) ui.taxFoldOpen = {};
+        ui.taxFoldOpen["scenario-solo"] = true;
+      }
       renderMain();
       return;
     }
@@ -1303,6 +1500,8 @@
       };
       state.employees.push(emp);
       openNewCostItem("employees", emp);
+      if (!ui.settingsFoldOpen) ui.settingsFoldOpen = {};
+      ui.settingsFoldOpen["org-payroll"] = true;
     } else if (action === "remove-employee") {
       state.employees.splice(index, 1);
     } else if (action === "add-recurring") {
@@ -1395,10 +1594,14 @@
       if (convertedPlan && convertedPlan.category) ui.rateOpen[convertedPlan.category] = true;
     } else if (action === "add-holiday") {
       state.customHolidays.push({ date: "", label: "회사 휴무" });
+      if (!ui.settingsFoldOpen) ui.settingsFoldOpen = {};
+      ui.settingsFoldOpen.holidays = true;
     } else if (action === "remove-holiday") {
       state.customHolidays.splice(index, 1);
     } else if (action === "add-workday") {
       state.forcedWorkdays.push({ date: "", label: "촬영" });
+      if (!ui.settingsFoldOpen) ui.settingsFoldOpen = {};
+      ui.settingsFoldOpen.workdays = true;
     } else if (action === "remove-workday") {
       state.forcedWorkdays.splice(index, 1);
     } else {
@@ -1419,7 +1622,6 @@
     }
     recompute();
     bind();
-    refreshSticky();
     try {
       var viewQ = new URLSearchParams(window.location.search).get("view");
       if (viewQ === "projects") viewQ = "revenue";
@@ -1431,15 +1633,19 @@
       if (viewQ) ui.view = viewQ;
     } catch (err) {}
     try {
-      ui.savedLoadOpen = ui.view === "dashboard" && sessionStorage.getItem(SAVED_LOAD_KEY) !== "1";
+      ui.savedLoadOpen = sessionStorage.getItem(UNLOCK_KEY) !== "1";
     } catch (err) {
-      ui.savedLoadOpen = ui.view === "dashboard";
+      ui.savedLoadOpen = true;
     }
+    refreshSticky();
     renderMain();
+    if (!ui.savedLoadOpen && App.Telegram && App.Telegram.notifyAccessOnce) {
+      App.Telegram.notifyAccessOnce();
+    }
     if (ui.loadError) {
       document.getElementById("saved").textContent = "저장 데이터를 읽지 못해 새로 시작합니다";
     }
-    if (App.RemoteStore && App.RemoteStore.isEnabled()) {
+    if (!ui.savedLoadOpen && App.RemoteStore && App.RemoteStore.isEnabled()) {
       var savedEl = document.getElementById("saved");
       if (savedEl) savedEl.textContent = "원격 저장소 확인 중";
       App.RemoteStore.loadLatest().then(function (res) {

@@ -155,6 +155,9 @@
       months
     );
     var lunchTruck = App.Engine.calculateLunchTruckSupport(state, months);
+    var profitSettle = App.Defaults.resolveOwnerProfitShare
+      ? App.Defaults.resolveOwnerProfitShare(state, months)
+      : { byMonth: {} };
 
     var parts = {
       months: months,
@@ -176,7 +179,8 @@
       assets: assets,
       deposits: deposits,
       support: support.soloByMonth,
-      lunchTruck: lunchTruck.byMonth
+      lunchTruck: lunchTruck.byMonth,
+      profitSettle: profitSettle
     };
     var vat = App.Engine.calculateVatCashFlow(state, parts, months);
     parts.vat = vat;
@@ -192,9 +196,6 @@
         byYear: tax.byYear,
         revenue: profit.revenue
       });
-    }
-    if (App.Engine.applyOwnerProfitShare) {
-      flows = App.Engine.applyOwnerProfitShare(state, flows);
     }
     if (App.Engine.applyCorporateTaxPending) {
       flows = App.Engine.applyCorporateTaxPending(flows, tax, state.settings.tax);
@@ -240,7 +241,7 @@
       capex: App.Money.sumBy(flows, function (r) { return r.capex; }),
       fundingOut: App.Money.sumBy(flows, function (r) { return r.deposits + r.capex; }),
       dividend: App.Money.sumBy(flows, function (r) { return r.dividend; }),
-      profitShare: App.Money.sumBy(flows, function (r) { return r.profitShare; }),
+      profitShare: App.Money.sumBy(flows, function (r) { return r.profitSettle || 0; }),
       revenue: profit.revenue,
       pnlExpense: profit.pnlExpense,
       operatingProfit: profit.operatingProfit,

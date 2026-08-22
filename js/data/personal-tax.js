@@ -31,6 +31,35 @@
     2027: tableFor(2027)
   };
 
+  var BUSINESS_EXPENSE_RATE_SOURCE_2025 =
+    "국세청 2025년 귀속 기준경비율·단순경비율 고시. 시뮬레이션용 참고값이며 실제 단순경비율 적용 가능 여부는 신고 요건에 따라 달라질 수 있습니다.";
+
+  var BUSINESS_EXPENSE_RATES = {
+    2025: {
+      "940302": {
+        businessCode: "940302",
+        businessName: "배우·탤런트 등",
+        simpleRate: 0.29,
+        standardRate: 0.059,
+        source: BUSINESS_EXPENSE_RATE_SOURCE_2025
+      }
+    }
+  };
+
+  function getBusinessExpenseRate(year, businessCode) {
+    var byYear = BUSINESS_EXPENSE_RATES[Number(year)];
+    var rule = byYear && byYear[businessCode];
+    if (!rule) return null;
+    return {
+      taxYear: Number(year),
+      businessCode: rule.businessCode,
+      businessName: rule.businessName,
+      simpleRate: rule.simpleRate,
+      standardRate: rule.standardRate,
+      source: rule.source
+    };
+  }
+
   var INCOME_TYPES = [
     { id: "earned", label: "근로·기타 개인소득 (급여/상여/배당 등)" },
     { id: "business", label: "사업소득 (전속 출연료 등)" },
@@ -95,8 +124,10 @@
     TABLES: TABLES,
     INCOME_TYPES: INCOME_TYPES,
     SOURCE: SOURCE_2023,
+    BUSINESS_EXPENSE_RATES: BUSINESS_EXPENSE_RATES,
     availableYears: availableYears,
     resolveTable: resolveTable,
+    getBusinessExpenseRate: getBusinessExpenseRate,
     calculateEarnedIncomeDeduction: calculateEarnedIncomeDeduction,
     earnedIncomeTaxCreditLimit: earnedIncomeTaxCreditLimit,
     calculateEarnedIncomeTaxCredit: calculateEarnedIncomeTaxCredit
