@@ -3,6 +3,7 @@ Thumbs.db
 *.log
 .env
 .env.*
+js/access-config.local.js
 node_modules/
 .claude/
 excel_dump.json

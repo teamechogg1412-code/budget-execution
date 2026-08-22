@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>내 전속계약 분석 — 1인 기획사 예산 시뮬레이터</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="css/landing.css" />
+</head>
+<body>
+  <div class="page" hidden>
+    <nav class="top-nav">
+      <a href="index.html" data-carry-ref>← 처음으로</a>
+      <a href="about.html" data-carry-ref>이 사이트를 만든 사람들</a>
+    </nav>
+
+    <div id="form-view">
+      <h1 style="font-size:20px;margin:8px 0 4px;">내 전속계약 분석</h1>
+      <p class="section-body">매출과 계약 조건을 한 화면에 넣고, 전속과 1인 기획사를 <strong>같은 지표끼리</strong> 비교합니다. 입력값은 이 브라우저에서만 계산되며 서버로 전송되지 않습니다.</p>
+
+      <form id="contract-form">
+        <div class="card">
+          <div class="field">
+            <label for="c-work">연간 작품 수익</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="c-work" placeholder="0" />
+              <span>원</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="c-ad">연간 광고·기타 수익</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="c-ad" placeholder="0" />
+              <span>원</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="c-rate">배우 정산 비율 (내가 가져가는 비율)</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="c-rate" placeholder="예: 70" />
+              <span>%</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="c-covered">회사(소속사) 부담 비용 · 연간</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="c-covered" placeholder="0" />
+              <span>원</span>
+            </div>
+            <div class="field-desc">스타일링·차량·매니저 등 소속사가 대신 내는 금액. 독립 시에는 법인 비용으로 반영됩니다.</div>
+          </div>
+          <div class="field">
+            <label for="c-actor-cost">배우 부담 비용 · 연간</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="c-actor-cost" placeholder="0" />
+              <span>원</span>
+            </div>
+            <div class="field-desc">헤어·메이크업 등 독립 후에도 필요한 비용. 전속에서는 개인 부담, 1인 기획사에서는 법인 운영비로 반영됩니다.</div>
+          </div>
+          <div class="field">
+            <label class="check-label">
+              <input type="checkbox" id="c-ad-fee-on" />
+              광고에 별도 수수료가 있음
+            </label>
+          </div>
+          <div class="field" id="ad-fee-field" hidden>
+            <label for="c-ad-fee">광고 별도 수수료율</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="c-ad-fee" placeholder="예: 20" />
+              <span>%</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="c-other-fin">기타 금융소득 · 연간 (선택)</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="c-other-fin" placeholder="0" />
+              <span>원</span>
+            </div>
+            <div class="field-desc">종합과세 판정에만 쓰이며, 표시 실수령에는 넣지 않습니다.</div>
+          </div>
+        </div>
+        <p class="small-print">가정: 비교 기간 1년 · 대표 월급여 500만원 · 배당 없음 · 상세 엔진과 동일한 세금 경로</p>
+        <button type="submit" class="btn btn-primary">계산하기</button>
+      </form>
+    </div>
+
+    <div id="result-view" hidden>
+      <h1 style="font-size:20px;margin:8px 0 8px;">계산 결과</h1>
+      <p class="section-body" style="margin-bottom:12px;">세후 개인 실수령과 통제 경제가치를 각각 같은 줄에서만 비교합니다.</p>
+
+      <div class="compare-table" role="table" aria-label="전속 vs 1인 기획사">
+        <div class="compare-row compare-head" role="row">
+          <div role="columnheader"></div>
+          <div role="columnheader">전속</div>
+          <div role="columnheader">1인 기획사</div>
+          <div role="columnheader">차이</div>
+        </div>
+        <div class="compare-row" role="row">
+          <div class="compare-metric" role="rowheader">세후 개인 실수령</div>
+          <div id="r-ex-net" role="cell">-</div>
+          <div id="r-solo-net" role="cell">-</div>
+          <div id="r-d-net" role="cell" class="delta">-</div>
+        </div>
+        <div class="compare-row" role="row">
+          <div class="compare-metric" role="rowheader">통제 경제가치</div>
+          <div id="r-ex-ev" role="cell">-</div>
+          <div id="r-solo-ev" role="cell">-</div>
+          <div id="r-d-ev" role="cell" class="delta">-</div>
+        </div>
+      </div>
+
+      <div class="verdict" id="r-verdict"></div>
+      <p class="small-print" id="r-sensitivity" hidden></p>
+      <p class="small-print" id="r-disclaimer"></p>
+
+      <button type="button" class="btn btn-secondary" id="btn-restart">가정 바꿔 다시 계산</button>
+      <a class="btn btn-secondary" id="cta-detail" href="../simulator/index.html" target="_blank" rel="noopener" data-carry-ref>더 자세히 계산</a>
+      <a class="btn btn-primary" id="cta-review" href="contact.html?intent=review" data-carry-ref>이 계산 검토받기</a>
+      <button type="button" class="btn btn-secondary" id="btn-share">계산기만 공유</button>
+      <a class="btn btn-secondary" href="reveal.html" data-carry-ref>실제로 운영한다면?</a>
+
+      <p class="small-print">공유 링크에는 입력 금액이 포함되지 않습니다. 결과는 시뮬레이션 예상치이며 세무·법률 자문이 아닙니다.</p>
+    </div>
+
+    <div class="brand-footer"><a href="about.html" data-carry-ref>누가 만들었나요?</a></div>
+  </div>
+
+  <script src="../js/money.js"></script>
+  <script src="../js/format.js"></script>
+  <script src="../js/month.js"></script>
+  <script src="../js/holidays-kr.js"></script>
+  <script src="../js/calendar.js"></script>
+  <script src="../js/data/categories.js"></script>
+  <script src="../js/data/personal-tax.js"></script>
+  <script src="../js/data/corporate-tax.js"></script>
+  <script src="../js/data/insurance-rules.js"></script>
+  <script src="../js/data/defaults.js"></script>
+  <script src="../js/engine/revenue.js"></script>
+  <script src="../js/engine/revenue-fees.js"></script>
+  <script src="../js/engine/expense.js"></script>
+  <script src="../js/engine/support.js"></script>
+  <script src="../js/engine/payroll.js"></script>
+  <script src="../js/engine/tax-year.js"></script>
+  <script src="../js/engine/tax.js"></script>
+  <script src="../js/engine/personal-tax.js"></script>
+  <script src="../js/engine/vat.js"></script>
+  <script src="../js/engine/cashflow.js"></script>
+  <script src="../js/engine/ledger.js"></script>
+  <script src="../js/engine/index.js"></script>
+  <script src="../js/engine/scenarios.js"></script>
+  <script src="../js/engine/payout-fit.js"></script>
+  <script src="../js/engine/revenue-floor.js"></script>
+  <script src="../js/engine/validation.js"></script>
+  <script src="js/contract-engine.js"></script>
+  <script src="js/campaign-config.js"></script>
+  <script src="js/link-gate.js"></script>
+  <script src="js/visit-ping-config.js"></script>
+  <script src="js/visit-ping.js"></script>
+  <script>
+    (function () {
+      var lastResult = null;
+      var DRAFT_KEY = "contractFormDraft";
+
+      App.LinkGate.check({ expiredUrl: "expired.html" }).then(function (state) {
+        if (state !== "expired") App.VisitPing.notify("contract");
+      });
+
+      function raw(id) { return document.getElementById(id).value; }
+      function setVal(id, v) {
+        var el = document.getElementById(id);
+        if (el && v != null) el.value = v;
+      }
+      function fmt(n) { return App.Format.formatWonAbout(n); }
+      function fmtDelta(n) {
+        var sign = n > 0 ? "+ " : (n < 0 ? "− " : "");
+        return sign + fmt(Math.abs(n));
+      }
+      function paintDelta(el, n) {
+        el.textContent = fmtDelta(n);
+        el.classList.remove("good", "bad");
+        if (n > 0) el.classList.add("good");
+        if (n < 0) el.classList.add("bad");
+      }
+
+      function readDraft() {
+        return {
+          work: raw("c-work"),
+          ad: raw("c-ad"),
+          rate: raw("c-rate"),
+          covered: raw("c-covered"),
+          actorCost: raw("c-actor-cost"),
+          adFeeOn: document.getElementById("c-ad-fee-on").checked,
+          adFee: raw("c-ad-fee"),
+          otherFin: raw("c-other-fin")
+        };
+      }
+
+      function saveDraft() {
+        try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(readDraft())); } catch (err) {}
+      }
+
+      function restoreDraft() {
+        try {
+          var rawDraft = sessionStorage.getItem(DRAFT_KEY);
+          if (!rawDraft) return;
+          var d = JSON.parse(rawDraft);
+          setVal("c-work", d.work);
+          setVal("c-ad", d.ad);
+          setVal("c-rate", d.rate);
+          setVal("c-covered", d.covered);
+          setVal("c-actor-cost", d.actorCost);
+          setVal("c-ad-fee", d.adFee);
+          setVal("c-other-fin", d.otherFin);
+          document.getElementById("c-ad-fee-on").checked = !!d.adFeeOn;
+          document.getElementById("ad-fee-field").hidden = !d.adFeeOn;
+        } catch (err) {}
+      }
+
+      restoreDraft();
+      document.getElementById("contract-form").addEventListener("change", saveDraft);
+      document.getElementById("contract-form").addEventListener("input", saveDraft);
+
+      document.getElementById("c-ad-fee-on").addEventListener("change", function () {
+        document.getElementById("ad-fee-field").hidden = !this.checked;
+        saveDraft();
+      });
+
+      document.getElementById("contract-form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        saveDraft();
+        var input = {
+          annualWorkIncome: raw("c-work"),
+          annualAdIncome: raw("c-ad"),
+          actorShareRatePercent: raw("c-rate"),
+          agencyCoveredCostAnnual: raw("c-covered"),
+          actorPersonalCostAnnual: raw("c-actor-cost"),
+          adSeparateFeeOn: document.getElementById("c-ad-fee-on").checked,
+          adFeeRatePercent: raw("c-ad-fee"),
+          otherFinancialIncome: raw("c-other-fin")
+        };
+        lastResult = App.ContractEngine.calculate(input);
+
+        document.getElementById("r-ex-net").textContent = fmt(lastResult.exclusive.actorNetIncome);
+        document.getElementById("r-solo-net").textContent = fmt(lastResult.soloAgency.actorNetIncome);
+        document.getElementById("r-ex-ev").textContent = fmt(lastResult.exclusive.controlledEconomicValue);
+        document.getElementById("r-solo-ev").textContent = fmt(lastResult.soloAgency.controlledEconomicValue);
+        paintDelta(document.getElementById("r-d-net"), lastResult.deltas.actorNetIncome);
+        paintDelta(document.getElementById("r-d-ev"), lastResult.deltas.controlledEconomicValue);
+
+        var v = document.getElementById("r-verdict");
+        v.textContent = lastResult.diagnosis.headline;
+        v.className = "verdict " + (
+          lastResult.diagnosis.verdict === "lean_solo" ? "solo" :
+          lastResult.diagnosis.verdict === "lean_exclusive" ? "current" : "similar"
+        );
+
+        var sens = document.getElementById("r-sensitivity");
+        if (lastResult.diagnosis.sensitivityHint) {
+          sens.hidden = false;
+          sens.textContent = lastResult.diagnosis.sensitivityHint;
+        } else {
+          sens.hidden = true;
+        }
+        document.getElementById("r-disclaimer").textContent = lastResult.diagnosis.disclaimer;
+
+        try {
+          sessionStorage.setItem("contractReviewSummary", App.ContractEngine.summaryText(lastResult));
+        } catch (err) {}
+        document.getElementById("cta-review").href = App.LinkGate.appendRef("contact.html?intent=review");
+
+        document.getElementById("form-view").hidden = true;
+        document.getElementById("result-view").hidden = false;
+        window.scrollTo(0, 0);
+      });
+
+      document.getElementById("btn-restart").addEventListener("click", function () {
+        document.getElementById("result-view").hidden = true;
+        document.getElementById("form-view").hidden = false;
+        window.scrollTo(0, 0);
+      });
+
+      document.getElementById("btn-share").addEventListener("click", function () {
+        var ref = App.LinkGate.getRef();
+        var url = App.ContractEngine.buildShareUrl(window.location, ref || "");
+        var shareData = {
+          title: "전속계약 분석",
+          text: "입력 금액 없이 계산기만 공유합니다.",
+          url: url
+        };
+        if (navigator.share) {
+          navigator.share(shareData).catch(function () {
+            prompt("공유 링크 (입력 금액 없음)", url);
+          });
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(function () {
+            alert("공유 링크를 복사했습니다. (입력 금액 없음)");
+          }).catch(function () {
+            prompt("공유 링크 (입력 금액 없음)", url);
+          });
+        } else {
+          prompt("공유 링크 (입력 금액 없음)", url);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -999,6 +999,7 @@
       "cashOutMonth": null,
       "cashOutMode": "none",
       "localTaxRate": 0.1,
+      "liquidationMode": "assumedRate",
       "liquidationTaxRate": 0.154,
       "lossCarryforward": {
         "apply": true,

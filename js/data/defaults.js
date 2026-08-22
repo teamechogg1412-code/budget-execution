@@ -13,7 +13,12 @@
       cashOutMonth: null,
       cashOutMode: "none",
       localTaxRate: 0.10,
+      liquidationMode: "assumedRate",
       liquidationTaxRate: 0.154,
+      // 의제배당 과세표준에서 차감하는 취득가액·납입자본금 등 (시뮬레이션 입력)
+      liquidationCapitalBasis: 0,
+      // 이 법인 배당 외 연간 이자·배당 등 금융소득 (2천만 종합과세 판정·합산용)
+      otherFinancialIncome: 0,
       lossCarryforward: {
         apply: true,
         openingBalance: 0,
@@ -598,7 +603,18 @@
       incomeDeduction: 0,
       taxCredit: 0,
       prepaidTax: 0,
-      withholdingTax: 0
+      withholdingTax: 0,
+      annual: {
+        necessaryExpenses: 0,
+        otherAdjustment: 0,
+        incomeDeduction: 0
+      },
+      oneTime: {
+        additionalIncome: 0,
+        taxCredit: 0,
+        prepaidTax: 0,
+        withholdingTax: 0
+      }
     };
   }
 
@@ -774,6 +790,16 @@
     return "auto";
   }
 
+  function pickPersonalTaxAmount(raw, nested, key) {
+    if (raw && Object.prototype.hasOwnProperty.call(raw, key) && raw[key] != null && raw[key] !== "") {
+      return App.Money.roundWon(raw[key]);
+    }
+    if (nested && nested[key] != null && nested[key] !== "") {
+      return App.Money.roundWon(nested[key]);
+    }
+    return 0;
+  }
+
   function normalizePersonalTax(raw, kind, yearHint) {
     raw = raw && typeof raw === "object" ? raw : {};
     var fallback = defaultPersonalTaxSettings(kind);
@@ -783,6 +809,15 @@
     if (incomeType !== "earned" && incomeType !== "business" && incomeType !== "mixed" && incomeType !== "other") {
       incomeType = fallback.incomeType;
     }
+    var annualIn = raw.annual && typeof raw.annual === "object" ? raw.annual : null;
+    var oneTimeIn = raw.oneTime && typeof raw.oneTime === "object" ? raw.oneTime : null;
+    var necessaryExpenses = pickPersonalTaxAmount(raw, annualIn, "necessaryExpenses");
+    var otherAdjustment = pickPersonalTaxAmount(raw, annualIn, "otherAdjustment");
+    var incomeDeduction = pickPersonalTaxAmount(raw, annualIn, "incomeDeduction");
+    var additionalIncome = pickPersonalTaxAmount(raw, oneTimeIn, "additionalIncome");
+    var taxCredit = pickPersonalTaxAmount(raw, oneTimeIn, "taxCredit");
+    var prepaidTax = pickPersonalTaxAmount(raw, oneTimeIn, "prepaidTax");
+    var withholdingTax = pickPersonalTaxAmount(raw, oneTimeIn, "withholdingTax");
     return {
       mode: raw.mode != null && String(raw.mode) !== "" ? normalizePersonalTaxMode(raw.mode) : "auto",
       manualTaxAmount: App.Money.roundWon(raw.manualTaxAmount),
@@ -791,13 +826,24 @@
       incomeType: incomeType,
       useLinkedIncome: raw.useLinkedIncome !== false,
       attributedIncome: App.Money.roundWon(raw.attributedIncome),
-      additionalIncome: App.Money.roundWon(raw.additionalIncome),
-      necessaryExpenses: App.Money.roundWon(raw.necessaryExpenses),
-      otherAdjustment: App.Money.roundWon(raw.otherAdjustment),
-      incomeDeduction: App.Money.roundWon(raw.incomeDeduction),
-      taxCredit: App.Money.roundWon(raw.taxCredit),
-      prepaidTax: App.Money.roundWon(raw.prepaidTax),
-      withholdingTax: App.Money.roundWon(raw.withholdingTax)
+      additionalIncome: additionalIncome,
+      necessaryExpenses: necessaryExpenses,
+      otherAdjustment: otherAdjustment,
+      incomeDeduction: incomeDeduction,
+      taxCredit: taxCredit,
+      prepaidTax: prepaidTax,
+      withholdingTax: withholdingTax,
+      annual: {
+        necessaryExpenses: necessaryExpenses,
+        otherAdjustment: otherAdjustment,
+        incomeDeduction: incomeDeduction
+      },
+      oneTime: {
+        additionalIncome: additionalIncome,
+        taxCredit: taxCredit,
+        prepaidTax: prepaidTax,
+        withholdingTax: withholdingTax
+      }
     };
   }
 
@@ -961,7 +1007,41 @@
   }
 
   function ownerDividendWithholding(amount) {
-    return withholdingAt(amount, 0.14, 0.154, "배당소득세 (15.4%)", "dividend");
+    return withholdingAt(amount, 0.14, 0.154, "배당소득 분리과세 (15.4%)", "dividend");
+  }
+
+  function financialIncomeComprehensiveThreshold() {
+    return (App.PersonalTax && App.PersonalTax.FINANCIAL_INCOME_COMPREHENSIVE_THRESHOLD) || 20000000;
+  }
+
+  // 연도 배당액 기준으로 분리과세(≤2천만) / 종합과세(초과) 라벨·원천액만 산출.
+  // 종합과세 시 실제 세액은 엔진이 근로·사업과 합산해 산출한다.
+  function ownerDividendTaxMeta(amount) {
+    var gross = App.Money.roundWon(amount);
+    var withholding = ownerDividendWithholding(gross);
+    var threshold = financialIncomeComprehensiveThreshold();
+    if (gross <= threshold) {
+      return {
+        mode: "separate",
+        amount: gross,
+        national: withholding.national,
+        local: withholding.local,
+        withholdingTotal: withholding.total,
+        total: withholding.total,
+        label: "배당소득 분리과세 (15.4%)",
+        kind: "dividend"
+      };
+    }
+    return {
+      mode: "comprehensive",
+      amount: gross,
+      national: withholding.national,
+      local: withholding.local,
+      withholdingTotal: withholding.total,
+      total: withholding.total,
+      label: "금융소득종합과세 (시뮬레이션)",
+      kind: "dividend"
+    };
   }
 
   function ownerProfitShareWithholding(amount) {
@@ -1607,7 +1687,14 @@
       cashOutMonth: App.Month.normalizeMonth(raw.cashOutMonth) || null,
       cashOutMode: cashOutMode,
       localTaxRate: raw.localTaxRate != null ? App.Money.toSafeNumber(raw.localTaxRate) : fallback.localTaxRate,
+      liquidationMode: raw.liquidationMode === "deemedDividend" ? "deemedDividend" : "assumedRate",
       liquidationTaxRate: raw.liquidationTaxRate != null ? App.Money.toSafeNumber(raw.liquidationTaxRate) : fallback.liquidationTaxRate,
+      liquidationCapitalBasis: Math.max(0, raw.liquidationCapitalBasis != null
+        ? App.Money.roundWon(raw.liquidationCapitalBasis)
+        : fallback.liquidationCapitalBasis),
+      otherFinancialIncome: Math.max(0, raw.otherFinancialIncome != null
+        ? App.Money.roundWon(raw.otherFinancialIncome)
+        : fallback.otherFinancialIncome),
       lossCarryforward: normalizeLossCarryforward(raw.lossCarryforward),
       adjustments: normalizeTaxAdjustments(raw.adjustments),
       corporateBrackets: migrateCorporateBrackets(raw.corporateBrackets, fallback.corporateBrackets),
@@ -2868,6 +2955,8 @@
     isDividendOn: isDividendOn,
     ownerDividendForMonth: ownerDividendForMonth,
     ownerDividendWithholding: ownerDividendWithholding,
+    ownerDividendTaxMeta: ownerDividendTaxMeta,
+    financialIncomeComprehensiveThreshold: financialIncomeComprehensiveThreshold,
     ownerProfitShareWithholding: ownerProfitShareWithholding,
     resolvedProfitShareExpenseRate: resolvedProfitShareExpenseRate,
     ACTOR_BUSINESS_CODE: ACTOR_BUSINESS_CODE,

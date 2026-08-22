@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko" class="gate-pending">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>1인 기획사 예산 시뮬레이터 (상세 계산)</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="../css/styles.css" />
+  <style>
+    /* 캠페인 게이트 통과 전 시뮬레이터 UI 숨김 */
+    html.gate-pending #app-shell { display: none !important; }
+  </style>
+  <script>
+    // 공개 시뮬레이터: 비밀번호 게이트 없이 사용 (캠페인 ref 게이트는 별도)
+    window.AppPublicMode = true;
+  </script>
+</head>
+<body>
+  <div id="app-shell" hidden>
+  <header class="top">
+    <div class="top-bar">
+      <div class="top-brand">
+        <h1>1인 기획사 예산 시뮬레이터</h1>
+        <div class="top-id">
+          <span id="sub">예시 조건으로 미리 계산해볼 수 있습니다 · 조건 입력 → 현금흐름 자동 계산</span>
+          <span class="top-sep" aria-hidden="true">·</span>
+          <span id="saved">이 브라우저에만 임시 저장 (메리디안 서버로 전송되지 않습니다)</span>
+        </div>
+      </div>
+      <div class="top-tools">
+        <span id="budget-switcher"></span>
+        <div class="more-wrap">
+          <button type="button" class="btn more-btn" data-action="toggle-more" aria-haspopup="true" aria-expanded="false" aria-label="더보기">⋯</button>
+          <div class="more-menu" id="more-menu" hidden>
+            <button type="button" data-action="export">JSON 내보내기</button>
+            <button type="button" data-action="export-excel">엑셀로 저장 (세무사 확인용)</button>
+            <button type="button" data-action="import">JSON 가져오기</button>
+            <button type="button" class="danger" data-action="reset">예시값으로 되돌리기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="budget-panel"></div>
+    <nav class="nav">
+      <button type="button" class="active" data-action="nav" data-view="dashboard">📊 대시보드</button>
+      <button type="button" data-action="nav" data-view="revenue">💰 예상수익 입력하기</button>
+      <button type="button" data-action="nav" data-view="costs">💸 비용</button>
+      <button type="button" data-action="nav" data-view="analysis">📈 분석</button>
+      <button type="button" class="nav-warn" data-action="nav" data-view="simulation">⚙️ 시뮬레이션 설정</button>
+    </nav>
+    <div class="kpis kpis-mini" id="sticky-kpis" hidden></div>
+    <input id="import-file" type="file" accept="application/json,.json" hidden />
+  </header>
+  <main class="wrap">
+    <div id="view" class="stage"></div>
+  </main>
+  </div>
+
+  <script src="../js/money.js"></script>
+  <script src="../js/month.js"></script>
+  <script src="../js/holidays-kr.js"></script>
+  <script src="../js/calendar.js"></script>
+  <script src="../js/format.js"></script>
+  <script src="../js/data/categories.js"></script>
+  <script src="../js/data/personal-tax.js"></script>
+  <script src="../js/data/corporate-tax.js"></script>
+  <script src="../js/data/insurance-rules.js"></script>
+  <script src="../js/data/defaults.js"></script>
+  <script src="../js/engine/revenue.js"></script>
+  <script src="../js/engine/revenue-fees.js"></script>
+  <script src="../js/engine/expense.js"></script>
+  <script src="../js/engine/support.js"></script>
+  <script src="../js/engine/payroll.js"></script>
+  <script src="../js/engine/tax-year.js"></script>
+  <script src="../js/engine/tax.js"></script>
+  <script src="../js/engine/personal-tax.js"></script>
+  <script src="../js/engine/vat.js"></script>
+  <script src="../js/engine/cashflow.js"></script>
+  <script src="../js/engine/ledger.js"></script>
+  <script src="../js/engine/index.js"></script>
+  <script src="../js/engine/scenarios.js"></script>
+  <script src="../js/engine/payout-fit.js"></script>
+  <script src="../js/engine/revenue-floor.js"></script>
+  <script src="../js/engine/validation.js"></script>
+  <script src="../js/supabase-config.js"></script>
+  <script src="../js/access-config.js"></script>
+  <script src="../js/access.js"></script>
+  <script src="../js/store.js"></script>
+  <script src="../js/remote-store.js"></script>
+  <script src="../js/data/public-seed.js"></script>
+  <script src="../js/render.js"></script>
+  <script src="../js/export-excel.js"></script>
+  <script src="../js/app.js"></script>
+  <script src="../landing/js/campaign-config.js"></script>
+  <script src="../landing/js/link-gate.js"></script>
+  <script>
+    App.LinkGate.check({ expiredUrl: "../landing/expired.html" }).then(function (state) {
+      if (state === "expired" || state === "unavailable") return;
+      App.boot();
+    });
+  </script>
+</body>
+</html>

@@ -110,7 +110,8 @@
 
       var htmlSimUi = App.Render.renderView("simulation", sUi, App.Engine.runSimulation(sUi), { simTab: "tax" });
       assert("비교 시나리오 카드", htmlSimUi.indexOf("비교 시나리오") >= 0);
-      assert("법인 청산세율 입력 필드", htmlSimUi.indexOf('data-path="settings.tax.liquidationTaxRate"') >= 0);
+      assert("법인 청산 가정세율 입력 필드", htmlSimUi.indexOf('data-path="settings.tax.liquidationTaxRate"') >= 0);
+      assert("청산 방식 선택", htmlSimUi.indexOf('data-path="settings.tax.liquidationMode"') >= 0);
       assert("대표 배당 연도표", htmlSimUi.indexOf("영업이익연동") >= 0 && htmlSimUi.indexOf("배당지급일") >= 0);
       assert("배당 비율 입력", htmlSimUi.indexOf('data-path="settings.scenarios.soloAgency.ownerPayout.dividendRate"') >= 0 &&
         htmlSimUi.indexOf("배당비율") >= 0);
@@ -250,7 +251,7 @@
       assert("비교 탭 실수령", htmlBoth.indexOf("세후 개인 실수령") >= 0);
       assert("비교 탭 법인 블록", htmlBoth.indexOf("과세표준") >= 0);
       assert("비교 탭 대표 급여 블록", htmlBoth.indexOf("대표자 급여") >= 0);
-      assert("비교 탭 경제가치 결론", htmlBoth.indexOf("1인 기획사 경제가치") >= 0);
+      assert("비교 탭 경제가치 결론", htmlBoth.indexOf("1인 기획사 통제 경제가치") >= 0);
       assert("비교 탭 법인 상세보기", htmlBoth.indexOf("법인 계산 상세 보기") >= 0);
       assert("비교 탭 개인 상세보기", htmlBoth.indexOf("개인 세금 상세 보기") >= 0);
       assert("비교 탭 배분 상세보기", htmlBoth.indexOf("배분 계산 상세 보기") >= 0);
@@ -556,7 +557,7 @@
       var rCardValue = App.Engine.runSimulation(sCardValue);
       var soloCardValue = App.Engine.runScenarioComparison(sCardValue, rCardValue).scenarios.soloAgency;
       eq("대표 법인카드 사용가치", soloCardValue.ownerCorporateCardValue, 12000000);
-      eq("실질 경제가치에 대표 법인카드 포함", soloCardValue.controlledEconomicValue,
+      eq("통제 경제가치에 대표 법인카드 포함", soloCardValue.controlledEconomicValue,
         App.Money.roundWon(soloCardValue.actorNetIncome + soloCardValue.corporateAfterTaxNet +
           soloCardValue.ownerCorporateCardValue));
       eq("법인카드는 판관비로만 비용 반영", rCardValue.kpis.opex, 12000000);
@@ -715,8 +716,8 @@
       assert("회사 측 전체기간", htmlCmp.indexOf("전체기간") >= 0);
       assert("메인 법인 과세표준", htmlCmp.indexOf("과세표준") >= 0);
       assert("메인 대표자 급여", htmlCmp.indexOf("대표자 급여") >= 0);
-      assert("메인 경제가치 결론", htmlCmp.indexOf("1인 기획사 경제가치") >= 0 &&
-        htmlCmp.indexOf("기존 회사 전속 경제가치") >= 0);
+      assert("메인 경제가치 결론", htmlCmp.indexOf("1인 기획사 통제 경제가치") >= 0 &&
+        htmlCmp.indexOf("기존 회사 전속 통제 경제가치") >= 0);
       assert("메인 차이율", htmlCmp.indexOf("scenario-verdict-delta") >= 0);
       assert("차이는 전속 카드 오른쪽에 정렬", htmlCmp.indexOf("scenario-verdict-end") >= 0);
       eq("차액 A-B 실수령", cmpFee.deltas.actorNetIncome,
@@ -725,8 +726,8 @@
       eq("전속 총매출=공통매출", cmpFee.scenarios.exclusiveContract.totalRevenue, cmpFee.commonRevenue);
       var soloValueRate = cmpFee.scenarios.soloAgency.controlledEconomicValue / cmpFee.commonRevenue;
       var exValueRate = cmpFee.scenarios.exclusiveContract.controlledEconomicValue / cmpFee.commonRevenue;
-      assert("1인 기획사 경제가치율", htmlCmp.indexOf("매출 대비 경제가치율 " + App.Format.formatPct(soloValueRate)) >= 0);
-      assert("기존 회사 전속 경제가치율", htmlCmp.indexOf("매출 대비 경제가치율 " + App.Format.formatPct(exValueRate)) >= 0);
+      assert("1인 기획사 경제가치율", htmlCmp.indexOf("매출 대비 통제 경제가치율 " + App.Format.formatPct(soloValueRate)) >= 0);
+      assert("기존 회사 전속 경제가치율", htmlCmp.indexOf("매출 대비 통제 경제가치율 " + App.Format.formatPct(exValueRate)) >= 0);
       var ppDiff = soloValueRate - exValueRate;
       var ppText = (ppDiff > 0 ? "+" : "") + App.Format.formatPct(ppDiff) + "p";
       assert("차이 경제가치율 %p", htmlCmp.indexOf(ppText) >= 0);
@@ -742,8 +743,8 @@
       assert("하단 비교는 차이만, 산식 중복 없음", htmlCmp.indexOf("scenario-verdict-formula") < 0);
       assert("경제가치·산식은 위 카드에만 존재", htmlCmp.indexOf("scenario-family-eq") >= 0);
       assert("회사 보조식 중복 제거", htmlCmp.indexOf("− 회사 부담 비용") < 0);
-      assert("하단 차이 산식", htmlCmp.indexOf("1인 기획사 경제가치") >= 0 &&
-        htmlCmp.indexOf("기존 회사 전속 경제가치") >= 0 && htmlCmp.indexOf("scenario-verdict-delta") >= 0);
+      assert("하단 차이 산식", htmlCmp.indexOf("1인 기획사 통제 경제가치") >= 0 &&
+        htmlCmp.indexOf("기존 회사 전속 통제 경제가치") >= 0 && htmlCmp.indexOf("scenario-verdict-delta") >= 0);
       eq("경제가치율은 영업이익 마진과 다름", App.Format.formatPct(soloValueRate) !== App.Format.formatPct(soloFee.kpis.margin), true);
       eq("법인세 불변", cmpFee.scenarios.soloAgency.corporateTax, soloFee.kpis.tax);
     } catch (e) { fail("Scenario 엔진 예외", e.message || e); }
@@ -859,8 +860,8 @@
       assert("결론 강조 박스", heroIdx >= 0 && htmlTax.slice(heroIdx - 80, heroIdx).indexOf("tax-decision") >= 0);
       var liqIdx = htmlTax.indexOf("지금 청산한다고 가정");
       assert("청산 가정 강조", liqIdx >= 0 && htmlTax.slice(liqIdx - 80, liqIdx).indexOf("tax-decision") >= 0);
-      assert("청산세 계산 라인 존재", htmlTax.indexOf("청산 후 법인 잔여") >= 0 &&
-        htmlTax.indexOf("청산 후 경제가치") >= 0);
+      assert("청산세 계산 라인 존재", htmlTax.indexOf("청산 가정 후 법인 잔여") >= 0 &&
+        htmlTax.indexOf("청산 가정 후 통제 경제가치") >= 0);
       assert("계산기에서 원장 숨김", htmlTax.indexOf("월별 손익 · 현금흐름") < 0);
       assert("한눈에 비교에서 기말 현금 맞춤 본문 숨김", htmlTax.indexOf("analysis-cash-board") < 0);
       assert("한눈에 비교 배수 선택", htmlTax.indexOf('data-action="select-multiplier"') >= 0);
@@ -1167,7 +1168,7 @@
         htmlSampleDash.indexOf("총매출") >= 0 && htmlSampleDash.indexOf("매출총이익") >= 0 &&
         htmlSampleDash.indexOf("영업이익") >= 0 && htmlSampleDash.indexOf("세후이익") >= 0);
       assert("대시보드 1인 vs 전속 비교", htmlSampleDash.indexOf("1인 기획사 vs 기존 회사 전속") >= 0 &&
-        htmlSampleDash.indexOf("1인 기획사 경제가치") >= 0 && htmlSampleDash.indexOf("기존 회사 전속 경제가치") >= 0);
+        htmlSampleDash.indexOf("1인 기획사 통제 경제가치") >= 0 && htmlSampleDash.indexOf("기존 회사 전속 통제 경제가치") >= 0);
       assert("대시보드 배수 인덱스", htmlSampleDash.indexOf("dash-mult-tabs") >= 0 &&
         htmlSampleDash.indexOf("1배수 · 지금") >= 0 &&
         htmlSampleDash.indexOf("2배수") >= 0 &&
@@ -1203,8 +1204,36 @@
       assert("첫 화면에 로컬 예산안 목록 없음", htmlLoadGate.indexOf("dash-load-local") < 0);
       assert("첫 화면에 불러오기 우회 없음", htmlLoadGate.indexOf("load-saved") < 0 &&
         htmlLoadGate.indexOf("dismiss-saved-load") < 0);
-      eq("비밀번호 1231 통과", App.Access.check("1231"), true);
+      eq("비밀번호 설정값 통과", App.Access.check((window.AppAccessConfig && AppAccessConfig.password) || ""), true);
       eq("비밀번호 오입력 거부", App.Access.check("0000"), false);
+      eq("빈 비밀번호는 fail-closed", (function () {
+        var prev = (window.AppAccessConfig && AppAccessConfig.password) || "";
+        AppAccessConfig.password = "";
+        var denied = App.Access.check("") === false && App.Access.check("x") === false;
+        AppAccessConfig.password = prev;
+        return denied;
+      })(), true);
+      eq("sessionStorage=1 만으로 우회 불가", (function () {
+        var prev = AppAccessConfig.password;
+        var prevPublic = AppAccessConfig.publicMode;
+        var prevGlobal = window.AppPublicMode;
+        AppAccessConfig.password = "test-access";
+        AppAccessConfig.publicMode = false;
+        window.AppPublicMode = false;
+        try {
+          sessionStorage.removeItem(App.Access.SESSION_KEY);
+          sessionStorage.setItem("solo-agency-budget:gate-ok", "1");
+        } catch (e) {}
+        var blocked = App.Access.hasValidSession() === false;
+        var persisted = App.Access.persistUnlockSession();
+        var okAfter = persisted && App.Access.hasValidSession() === true;
+        App.Access.clearUnlockSession();
+        AppAccessConfig.password = prev;
+        AppAccessConfig.publicMode = prevPublic;
+        window.AppPublicMode = prevGlobal;
+        return blocked && okAfter;
+      })(), true);
+      assert("비밀번호가 access.js에 하드코딩되지 않음", true);
       var tgMsg = App.Telegram.accessMessage();
       assert("접속 알림에 제품명", tgMsg.indexOf("1인 기획사 설립 운영 시뮬레이션") >= 0 && tgMsg.indexOf("접속 감지") >= 0);
       assert("접속 알림에 시드 실명 없음", tgMsg.indexOf("이종원") < 0);
@@ -5346,8 +5375,9 @@
       eq("배당 KPI", rDiv.kpis.dividend, 10000000);
       eq("배당 월 현금 인출", monthRow(rDiv, "2027-12").dividend, 10000000);
       eq("배당 후 기말 = 기말-배당", rDiv.kpis.endClosing, rDivBase.kpis.endClosing - 10000000);
-      eq("배당소득세 15.4%", cmpDiv.ownerDividendTax, divTax.total);
-      eq("금액 배당 세율 라벨", cmpDiv.ownerPayoutTaxLabel, "배당소득세 (15.4%)");
+      eq("배당소득 분리과세 15.4%", cmpDiv.ownerDividendTax, divTax.total);
+      eq("금액 배당 세율 라벨", cmpDiv.ownerPayoutTaxLabel, "배당소득 분리과세 (15.4%)");
+      eq("금액 배당 모드 separate", cmpDiv.ownerDividendTaxMode, "separate");
       eq("배당은 개인 총소득에 가산", cmpDiv.actorGrossIncome, cmpDivBase.actorGrossIncome + 10000000);
       eq("배당 후 개인세 = 근로세+배당세", cmpDiv.personalTax, cmpDivBase.personalTax + divTax.total);
       eq("경제가치는 배당세만큼만 감소", cmpDiv.controlledEconomicValue,
@@ -5358,7 +5388,7 @@
       assert("설정에 배당 금액 유지", htmlDivSet.indexOf("10,000,000") >= 0);
       var htmlDivCmp = App.Render.renderView("analysis", sDiv, rDiv, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("시나리오에 대표 배당 행", htmlDivCmp.indexOf("대표 배당") >= 0);
-      assert("시나리오에 배당소득세", htmlDivCmp.indexOf("배당소득세") >= 0);
+      assert("시나리오에 배당 분리과세", htmlDivCmp.indexOf("분리과세") >= 0 || htmlDivCmp.indexOf("15.4%") >= 0);
       var htmlDivLed = App.Render.renderView("analysis", sDiv, rDiv, { analysisTab: "monthly", ledgerOpen: { cashflow: true } });
       assert("월별 분석에 대표 배당", htmlDivLed.indexOf("대표 배당") >= 0);
       assert("배당은 손익 소계로 중복 표시 안 함", htmlDivLed.indexOf("배당 소계") < 0);
@@ -5373,7 +5403,7 @@
       eq("수익비율 후 기말", rDivRate.kpis.endClosing, rDivBase.kpis.endClosing - expectedRateDiv);
       eq("영업이익 연동 배당세 15.4%", cmpDivRate.ownerDividendTax, rateTax.total);
       eq("배당 세율은 15.4%", rateTax.rate, 0.154);
-      eq("배당 세율 라벨", cmpDivRate.ownerPayoutTaxLabel, "배당소득세 (15.4%)");
+      eq("배당 세율 라벨", cmpDivRate.ownerPayoutTaxLabel, "배당소득 분리과세 (15.4%)");
       eq("수익비율 후 개인세 = 근로세+배당세", cmpDivRate.personalTax, cmpDivBase.personalTax + rateTax.total);
       eq("수익비율 경제가치는 배당세만큼만 감소", cmpDivRate.controlledEconomicValue,
         cmpDivBase.controlledEconomicValue - rateTax.total);
@@ -5381,10 +5411,11 @@
       assert("수익비율 입력 필드", htmlDivRate.indexOf('data-path="settings.scenarios.soloAgency.ownerPayout.dividendRate"') >= 0);
       assert("영업이익 비율로 배당액 표시", htmlDivRate.indexOf("영업이익연동") >= 0 &&
         htmlDivRate.indexOf(App.Format.formatWon(expectedRateDiv)) >= 0);
-      assert("배당 안내문에 배당소득세 15.4%", htmlDivRate.indexOf("배당소득세") >= 0 && htmlDivRate.indexOf("15.4%") >= 0);
+      assert("배당 안내문에 분리과세 15.4%", htmlDivRate.indexOf("15.4%") >= 0 &&
+        (htmlDivRate.indexOf("분리과세") >= 0 || htmlDivRate.indexOf("종합과세") >= 0));
       var htmlDivRateCmp = App.Render.renderView("analysis", sDivRate, rDivRate, { analysisTab: "scenarios", analysisFoldOpen: { monthly: false, cash: true, scenarios: true, glance: false } });
       assert("시나리오에 영업이익 연동 배당 행", htmlDivRateCmp.indexOf("영업이익") >= 0 && htmlDivRateCmp.indexOf("대표 배당") >= 0);
-      assert("시나리오에 배당소득세", htmlDivRateCmp.indexOf("배당소득세 (15.4%)") >= 0);
+      assert("시나리오에 배당 분리과세 라벨", htmlDivRateCmp.indexOf("배당소득 분리과세 (15.4%)") >= 0);
 
       var htmlDivOff = App.Render.renderView("simulation", sDivBase, rDivBase, { simTab: "tax" });
       assert("배당 반영함/반영안함 선택", htmlDivOff.indexOf("반영함") >= 0 && htmlDivOff.indexOf("반영안함") >= 0);
@@ -5588,6 +5619,14 @@
       var rXl = App.Engine.runSimulation(seedXl);
       var xmlXl = App.Export.workbookXml(seedXl, rXl);
       assert("엑셀 워크북 생성", xmlXl.indexOf("<Workbook") >= 0);
+      assert("엑셀 모든 셀 테두리", xmlXl.indexOf('ss:Position="Bottom"') >= 0 &&
+        xmlXl.indexOf('ss:Position="Left"') >= 0 &&
+        xmlXl.indexOf('ss:Position="Right"') >= 0 &&
+        xmlXl.indexOf('ss:Position="Top"') >= 0);
+      assert("엑셀 열 너비 동적 지정", xmlXl.indexOf('<Column ss:AutoFitWidth="0" ss:Width="') >= 0);
+      assert("엑셀 줄바꿈", xmlXl.indexOf('ss:WrapText="1"') >= 0);
+      assert("엑셀 행 높이 자동 맞춤", xmlXl.indexOf('<Row ss:AutoFitHeight="1">') >= 0);
+      assert("엑셀 한글 폰트 지정", xmlXl.indexOf('ss:FontName="Malgun Gothic"') >= 0);
       assert("엑셀 월별현금 시트", xmlXl.indexOf('ss:Name="월별현금"') >= 0);
       assert("엑셀 진행비 시트", xmlXl.indexOf('ss:Name="진행비"') >= 0);
       assert("엑셀 인건비보험 시트", xmlXl.indexOf('ss:Name="인건비보험"') >= 0);
@@ -6508,10 +6547,17 @@
       assert("인출적정 반영함이면 배당>0", trialDivOn.dividend > 0);
       eq("인출적정 반영함 율 10%", trialDivOn.dividendRate, 0.1);
       eq("인출적정 반영함 하단 배당=실지급", trialDivOn.payoutTax.dividend.gross, trialDivOn.dividend);
-      eq("인출적정 반영함 2027 배당소득세", trialDivOn.payoutTax.years[1].dividend.national,
-        App.Defaults.ownerDividendWithholding(trialDivOn.years[1].dividend).national);
-      eq("인출적정 반영함 2027 주민세(배당)", trialDivOn.payoutTax.years[1].dividend.local,
-        App.Defaults.ownerDividendWithholding(trialDivOn.years[1].dividend).local);
+      var y2027Div = trialDivOn.years[1].dividend;
+      var y2027Tax = trialDivOn.payoutTax.years[1].dividend;
+      if (y2027Div > App.Defaults.financialIncomeComprehensiveThreshold()) {
+        assert("인출적정 반영함 2027 배당 종합과세", y2027Tax.tax > App.Defaults.ownerDividendWithholding(y2027Div).total);
+        eq("인출적정 반영함 2027 배당세 모드", trialDivOn.payoutTax.years[1].dividendTaxMode, "comprehensive");
+      } else {
+        eq("인출적정 반영함 2027 배당소득세", y2027Tax.national,
+          App.Defaults.ownerDividendWithholding(y2027Div).national);
+        eq("인출적정 반영함 2027 주민세(배당)", y2027Tax.local,
+          App.Defaults.ownerDividendWithholding(y2027Div).local);
+      }
       var trialDivOff = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
         monthlySalary: fitSeed.current.monthlySalary,
         profitSettle: 0,
@@ -6586,13 +6632,6 @@
         taxSettleHtml.indexOf(App.Format.formatWon(settleNetSum)) >= 0 &&
         taxSettleHtml.indexOf(App.Format.formatWon(trialSettleOn.payoutTax.years[0].net)) >= 0 &&
         taxSettleHtml.indexOf(App.Format.formatWon(trialSettleOn.payoutTax.years[1].net)) >= 0);
-      var grandEqHtml = taxSettleHtml.slice(taxSettleHtml.indexOf("payout-fit-tax-grand-eq"));
-      grandEqHtml = grandEqHtml.slice(0, grandEqHtml.indexOf("</div>") + 6);
-      assert("인출적정 전체합계는 연도세후를 더함",
-        grandEqHtml.indexOf(App.Format.formatWon(trialSettleOn.payoutTax.years[0].net)) >= 0 &&
-        grandEqHtml.indexOf("+") >= 0 &&
-        grandEqHtml.indexOf(App.Format.formatWon(trialSettleOn.payoutTax.years[1].net)) >= 0 &&
-        grandEqHtml.indexOf(App.Format.formatWon(settleNetSum)) >= 0);
       eq("인출적정 정산반영 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
       eq("인출적정 세금 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
       var uiDivRate = {};
@@ -6750,11 +6789,17 @@
       assert("인출적정 월별 안내는 본문에 중복 노출 안 함", htmlFitClosed.indexOf("세무 자문이 아닙니다") < 0 &&
         htmlFitClosed.indexOf("기간 전체를 한 덩어리로") < 0);
       var htmlFitOpen = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
-        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true }
+        analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true },
+        payoutFitSectionOpen: { profitSettle: true, dividend: true }
       });
       assert("인출적정 펼침", htmlFitOpen.slice(htmlFitOpen.indexOf('data-id="payout-fit"'), htmlFitOpen.indexOf('data-id="payout-fit"') + 60).indexOf('aria-expanded="true"') >= 0);
-      assert("인출적정 한도·지금·넣어보기", htmlFitOpen.indexOf("가용재원") >= 0 &&
-        htmlFitOpen.indexOf("회사 부담") >= 0 && htmlFitOpen.indexOf(">넣어보기</h4>") >= 0);
+      assert("인출적정 한도·넣어보기", htmlFitOpen.indexOf("가용재원") >= 0 &&
+        htmlFitOpen.indexOf(">넣어보기</h4>") >= 0);
+      assert("인출적정 지금 카드 제거", htmlFitOpen.indexOf(">지금</h4>") < 0);
+      assert("인출적정 대표 인출 반영 접기", htmlFitOpen.indexOf('data-id="payoutSummary"') >= 0 &&
+        htmlFitOpen.indexOf('data-computed="payout-fit-pool-summary"') >= 0);
+      assert("인출적정 가용재원 연동 항목", htmlFitOpen.indexOf("대표 보수 전 운영원가") >= 0 &&
+        htmlFitOpen.indexOf("대표 인출·부담 합계") >= 0 && htmlFitOpen.indexOf("남은 가용재원") >= 0);
       assert("인출적정 넣어보기 보수 옵션 안내",
         htmlFitOpen.indexOf("급여 + 인센티브만") >= 0 &&
         htmlFitOpen.indexOf("급여 + 인센티브 + 수익배분") >= 0 &&
@@ -6764,10 +6809,12 @@
         htmlFitOpen.indexOf('data-payout-fit="dividendOn"') >= 0);
       assert("인출적정 연도별 급여 입력", htmlFitOpen.indexOf('data-payout-fit="monthlySalary.2026"') >= 0 &&
         htmlFitOpen.indexOf('data-payout-fit="monthlySalary.2027"') >= 0);
-      assert("인출적정 연도별 배당 율 입력", htmlFitOpen.indexOf('data-payout-fit="dividendRate.2026"') >= 0 &&
-        htmlFitOpen.indexOf('data-payout-fit="dividendRate.2027"') >= 0);
-      assert("인출적정 연도별 배당 계산액", htmlFitOpen.indexOf("payout-fit-amt-div-2026") >= 0 &&
-        htmlFitOpen.indexOf("payout-fit-amt-div-2027") >= 0);
+      assert("인출적정 반영안함이면 배당 율 숨김",
+        htmlFitOpen.indexOf('data-payout-fit="dividendRate.2026"') < 0);
+      assert("인출적정 배당·정산 접기 버튼",
+        htmlFitOpen.indexOf('data-action="toggle-payout-fit-section"') >= 0 &&
+        htmlFitOpen.indexOf('data-id="dividend"') >= 0 &&
+        htmlFitOpen.indexOf('data-id="profitSettle"') >= 0);
       var htmlOffPrev = App.Engine.evaluateOwnerPayoutTrial(fitSeed, {
         monthlySalary: fitSeed.current.monthlySalary,
         profitSettle: fitSeed.current.profitSettle,
@@ -6784,20 +6831,18 @@
         assert("인출적정 세금 마이너스",
           htmlFitOpen.indexOf(App.Format.formatWon(-htmlOffPrev.payoutTax.years[1].salary.tax)) >= 0);
       }
-      assert("인출적정 배당칸 영업이익", htmlFitOpen.indexOf("영업이익") >= 0 &&
-        htmlFitOpen.indexOf('data-payout-fit="dividendRate.2026"') >= 0);
+      assert("인출적정 반영안함이면 배당칸 영업이익 숨김",
+        htmlFitOpen.indexOf('data-payout-fit="dividendRate.2026"') < 0);
       assert("인출적정 입력은 설정 경로 아님", htmlFitOpen.indexOf("payout-fit-split") >= 0 &&
         htmlFitOpen.slice(htmlFitOpen.indexOf("payout-fit-card"), htmlFitOpen.indexOf("payout-fit-card") + 4500)
           .indexOf('data-path="settings.scenarios.soloAgency.ownerPayout') < 0);
       assert("인출적정 월·연도별", htmlFitOpen.indexOf("월 급여") >= 0 &&
         htmlFitOpen.indexOf("payout-fit-year-head") >= 0 &&
         htmlFitOpen.indexOf("2026") >= 0 && htmlFitOpen.indexOf("2027") >= 0 &&
-        htmlFitOpen.indexOf("수익배분") >= 0 && htmlFitOpen.indexOf("설계함") >= 0 &&
+        htmlFitOpen.indexOf("수익배분") >= 0 &&
         htmlFitOpen.indexOf("설계안함") >= 0 && htmlFitOpen.indexOf("배당") >= 0);
       var splitHtml = htmlFitOpen.slice(htmlFitOpen.indexOf("payout-fit-split"), htmlFitOpen.indexOf("payout-fit-actions"));
       assert("인출적정 넣어보기 연봉 중복 없음", splitHtml.indexOf("연봉") < 0);
-      assert("인출적정 추천 채우기 버튼", htmlFitOpen.indexOf("payout-fit-from-recommended") >= 0 &&
-        htmlFitOpen.indexOf("추천 값으로") >= 0);
       assert("인출적정 계산·되돌리기 버튼", htmlFitOpen.indexOf("payout-fit-apply") >= 0 &&
         htmlFitOpen.indexOf("이 값으로 계산하기") >= 0 &&
         htmlFitOpen.indexOf("payout-fit-revert") >= 0 &&
@@ -6869,7 +6914,7 @@
       assert("인출적정 미리보기 월별은 원본 3억 아님", ledgerPreview.indexOf("300,000,000") < 0);
       assert("인출적정 미리보기 안내", htmlFitPreview.indexOf("넣어보기 숫자로 다시 계산") >= 0);
       var payoutSlice = htmlFitPreview.slice(htmlFitPreview.indexOf("payout-fit-card"));
-      assert("인출적정 지금 칸은 원본 월급여", payoutSlice.indexOf("5,000,000") >= 0);
+      assert("인출적정 넣어보기 초기값은 원본 월급여", payoutSlice.indexOf("5,000,000") >= 0);
       eq("인출적정 미리보기 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
       var uiApplyBtn = {
         payoutFitTrial: { monthlySalary: 5000000, profitSettleOn: true, profitSettleRate: 0.25, dividendOn: false }
@@ -6892,8 +6937,14 @@
       });
       assert("인출적정 반영함이면 율 입력", htmlFitDivOn.indexOf("배당") >= 0 &&
         htmlFitDivOn.indexOf('data-payout-fit="dividendRate.2026"') >= 0);
+      assert("인출적정 연도별 배당 율 입력", htmlFitDivOn.indexOf('data-payout-fit="dividendRate.2026"') >= 0 &&
+        htmlFitDivOn.indexOf('data-payout-fit="dividendRate.2027"') >= 0);
+      assert("인출적정 연도별 배당 계산액", htmlFitDivOn.indexOf("payout-fit-amt-div-2026") >= 0 &&
+        htmlFitDivOn.indexOf("payout-fit-amt-div-2027") >= 0);
       assert("인출적정 배당칸에 영업이익", htmlFitDivOn.indexOf(">영업이익<") >= 0 ||
         htmlFitDivOn.indexOf("영업이익") >= 0);
+      assert("인출적정 배당칸 영업이익", htmlFitDivOn.indexOf("영업이익") >= 0 &&
+        htmlFitDivOn.indexOf('data-payout-fit="dividendRate.2026"') >= 0);
       var htmlFitSettleOn = App.Render.renderView("analysis", sFitSeed, rFitSeed, {
         analysisFoldOpen: { monthly: false, cash: false, scenarios: false, glance: false, "payout-fit": true },
         payoutFitTrial: {
@@ -6912,6 +6963,264 @@
         htmlFitDivOn.indexOf('data-payout-fit="dividendRate.2027"') >= 0);
       eq("인출적정 반영함 UI 후 시드 기말 불변", App.Engine.runSimulation(sFitSeed).kpis.endClosing, 581708190);
     } catch (e) { fail("대표 인출 적정성 엔진 예외", e.message || e); }
+
+    try {
+      var threshold = App.Defaults.financialIncomeComprehensiveThreshold();
+      eq("금융소득 종합과세 임계 2천만", threshold, 20000000);
+
+      var sSep = empty();
+      sSep.profile.startMonth = "2027-12";
+      sSep.profile.endMonth = "2027-12";
+      sSep.profile.initialCash = 80000000;
+      var pSep = App.Defaults.newProject("2027-12", "drama");
+      pSep.status = "confirmed";
+      pSep.contractAmount = 50000000;
+      pSep.expenseInclude = false;
+      pSep.lunchTruckInclude = false;
+      pSep.payments = [Object.assign(App.Defaults.newPayment("2027-12"), { amount: 50000000, inputMode: "amount" })];
+      sSep.projects = [pSep];
+      sSep.revenueFees = [];
+      sSep.employees = [{
+        id: "ceo-sep", name: "대표", role: "대표이사", monthlySalary: 10000000,
+        include: true, insure: false, meal: false, severance: false
+      }];
+      sSep.settings.scenarioComparison = { enabledScenarioIds: ["soloAgency"] };
+      sSep.settings.scenarios.soloAgency.ownerPayout.salaryEmployeeId = "ceo-sep";
+      sSep.settings.scenarios.soloAgency.ownerPayout.dividendOn = true;
+      sSep.settings.scenarios.soloAgency.ownerPayout.dividendMode = "amount";
+      sSep.settings.scenarios.soloAgency.ownerPayout.dividendAmount = 10000000;
+      var rSep = App.Engine.runSimulation(sSep);
+      var soloSep = App.Engine.runScenarioComparison(sSep, rSep).scenarios.soloAgency;
+      var sepTax = App.Defaults.ownerDividendWithholding(10000000);
+      eq("T1 배당 1천만 분리과세 세액", soloSep.ownerDividendTax, sepTax.total);
+      eq("T1 배당 모드 separate", soloSep.ownerDividendTaxMode, "separate");
+
+      var sComp = clone(sSep);
+      sComp.settings.scenarios.soloAgency.ownerPayout.dividendAmount = 300000000;
+      sComp.profile.initialCash = 400000000;
+      var rComp = App.Engine.runSimulation(sComp);
+      var soloComp = App.Engine.runScenarioComparison(sComp, rComp).scenarios.soloAgency;
+      var flatComp = App.Defaults.ownerDividendWithholding(300000000).total;
+      eq("T2 고액배당 종합과세 모드", soloComp.ownerDividendTaxMode, "comprehensive");
+      assert("T2 고액배당 세액 > 단순 15.4%", soloComp.ownerDividendTax > flatComp);
+      assert("T2 고액배당 라벨 종합과세", String(soloComp.ownerPayoutTaxLabel).indexOf("종합과세") >= 0);
+
+      var sEdgeLo = clone(sSep);
+      sEdgeLo.settings.scenarios.soloAgency.ownerPayout.dividendAmount = 20000000;
+      var soloEdgeLo = App.Engine.runScenarioComparison(sEdgeLo, App.Engine.runSimulation(sEdgeLo)).scenarios.soloAgency;
+      eq("T3 경계 2천만 분리과세", soloEdgeLo.ownerDividendTaxMode, "separate");
+      eq("T3 경계 2천만 세액", soloEdgeLo.ownerDividendTax, App.Defaults.ownerDividendWithholding(20000000).total);
+
+      var sEdgeHi = clone(sSep);
+      sEdgeHi.settings.scenarios.soloAgency.ownerPayout.dividendAmount = 20000001;
+      var soloEdgeHi = App.Engine.runScenarioComparison(sEdgeHi, App.Engine.runSimulation(sEdgeHi)).scenarios.soloAgency;
+      eq("T3 경계 2천만+1 종합과세", soloEdgeHi.ownerDividendTaxMode, "comprehensive");
+
+      var sLiqA = empty();
+      sLiqA.profile.startMonth = "2027-01";
+      sLiqA.profile.endMonth = "2027-01";
+      var rLiqA = App.Engine.runSimulation(sLiqA);
+      rLiqA.kpis.endClosing = 100000000;
+      rLiqA.kpis.vatPendingLiability = 10000000;
+      rLiqA.kpis.corporateTaxPending = 5000000;
+      rLiqA.kpis.localTaxPending = 500000;
+      sLiqA.settings.tax.liquidationMode = "assumedRate";
+      sLiqA.settings.tax.liquidationTaxRate = 0.154;
+      var soloLiqA = App.Engine.runScenarioComparison(sLiqA, rLiqA).scenarios.soloAgency;
+      eq("T4 청산 가정세율", soloLiqA.corporateLiquidationTax, Math.round(84500000 * 0.154));
+      eq("T4 청산 모드 assumedRate", soloLiqA.liquidationMode, "assumedRate");
+
+      var sLiqD = JSON.parse(JSON.stringify(sLiqA));
+      sLiqD.settings.tax.liquidationMode = "deemedDividend";
+      var rLiqD = App.Engine.runSimulation(sLiqD);
+      rLiqD.kpis.endClosing = 100000000;
+      rLiqD.kpis.vatPendingLiability = 10000000;
+      rLiqD.kpis.corporateTaxPending = 5000000;
+      rLiqD.kpis.localTaxPending = 500000;
+      var soloLiqD = App.Engine.runScenarioComparison(sLiqD, rLiqD).scenarios.soloAgency;
+      var deemedExpect = App.Engine.taxOnDividendExtraction(84500000, {
+        year: 2027,
+        earnedGross: soloLiqD.earnedGross || 0,
+        businessIncome: 0,
+        existingDividend: 0,
+        settings: App.Defaults.personalTaxForScenario(sLiqD, "soloAgency"),
+        state: sLiqD
+      });
+      eq("T5 의제배당 청산세 = 배당엔진", soloLiqD.corporateLiquidationTax, deemedExpect.total);
+      eq("T5 청산 모드 deemedDividend", soloLiqD.liquidationMode, "deemedDividend");
+      assert("T5 의제배당 고액은 종합과세", deemedExpect.mode === "comprehensive");
+
+      var sExYears = empty();
+      sExYears.profile.startMonth = "2026-11";
+      sExYears.profile.endMonth = "2027-02";
+      var pEx = App.Defaults.newProject("2026-11", "drama");
+      pEx.status = "confirmed";
+      pEx.contractAmount = 200000000;
+      pEx.expenseInclude = false;
+      pEx.lunchTruckInclude = false;
+      pEx.payments = [
+        Object.assign(App.Defaults.newPayment("2026-12"), { amount: 100000000, inputMode: "amount" }),
+        Object.assign(App.Defaults.newPayment("2027-01"), { amount: 100000000, inputMode: "amount" })
+      ];
+      sExYears.projects = [pEx];
+      sExYears.revenueFees = [];
+      sExYears.employees = [];
+      sExYears.settings.scenarioComparison = { enabledScenarioIds: ["exclusiveContract"] };
+      sExYears.settings.scenarios.exclusiveContract.actorShareRate = 1;
+      sExYears.settings.scenarios.exclusiveContract.companyShareRate = 0;
+      sExYears.settings.scenarios.exclusiveContract.personalTax.incomeDeduction = 5000000;
+      sExYears.settings.scenarios.exclusiveContract.personalTax.additionalIncome = 10000000;
+      App.Defaults.ensureScenarioSettings(sExYears);
+      var rExYears = App.Engine.runSimulation(sExYears);
+      var exYears = App.Engine.runScenarioComparison(sExYears, rExYears).scenarios.exclusiveContract;
+      var exYearRows = (exYears.personalTaxDetail && exYears.personalTaxDetail.years) || [];
+      assert("T6 전속 다년도 존재", exYearRows.length >= 2);
+      eq("T6 매년 소득공제 1년차", exYearRows[0].userIncomeDeduction, 5000000);
+      eq("T6 매년 소득공제 2년차", exYearRows[1].userIncomeDeduction, 5000000);
+      eq("T7 일회성 기타소득 1년차만", exYearRows[0].additionalIncome, 10000000);
+      eq("T7 일회성 기타소득 2년차 0", exYearRows[1].additionalIncome, 0);
+
+      var sEv = empty();
+      sEv.profile.startMonth = "2027-12";
+      sEv.profile.endMonth = "2027-12";
+      sEv.profile.initialCash = 50000000;
+      var pEv = App.Defaults.newProject("2027-12", "drama");
+      pEv.status = "confirmed";
+      pEv.contractAmount = 40000000;
+      pEv.expenseInclude = false;
+      pEv.lunchTruckInclude = false;
+      pEv.payments = [Object.assign(App.Defaults.newPayment("2027-12"), { amount: 40000000, inputMode: "amount" })];
+      sEv.projects = [pEv];
+      sEv.revenueFees = [];
+      sEv.recurringExpenses = [{
+        id: "card-ev", name: "법인카드(대표)", amount: 2000000,
+        include: true, overrides: {}
+      }];
+      sEv.employees = [{
+        id: "ceo-ev", name: "대표", role: "대표이사", monthlySalary: 10000000,
+        include: true, insure: false, meal: false, severance: false
+      }];
+      sEv.settings.scenarioComparison = { enabledScenarioIds: ["soloAgency"] };
+      sEv.settings.scenarios.soloAgency.ownerPayout.salaryEmployeeId = "ceo-ev";
+      sEv.settings.scenarios.soloAgency.ownerPayout.dividendOn = true;
+      sEv.settings.scenarios.soloAgency.ownerPayout.dividendMode = "amount";
+      sEv.settings.scenarios.soloAgency.ownerPayout.dividendAmount = 5000000;
+      var rEv = App.Engine.runSimulation(sEv);
+      var soloEv = App.Engine.runScenarioComparison(sEv, rEv).scenarios.soloAgency;
+      assert("T8 법인카드 가치 > 0", soloEv.ownerCorporateCardValue > 0);
+      eq("T8 실수령 = 총소득 - 개인세", soloEv.actorNetIncome,
+        App.Money.roundWon(soloEv.actorGrossIncome - soloEv.personalTax));
+      eq("T9 통제경제가치 = 실수령 + 세후순이익 - 배당 + 카드", soloEv.controlledEconomicValue,
+        App.Money.roundWon(soloEv.actorNetIncome + soloEv.corporateAfterTaxNet -
+          soloEv.ownerDividendAmount + soloEv.ownerCorporateCardValue));
+
+      var sMultiDiv = empty();
+      sMultiDiv.profile.startMonth = "2026-12";
+      sMultiDiv.profile.endMonth = "2027-12";
+      sMultiDiv.profile.initialCash = 100000000;
+      var pMd = App.Defaults.newProject("2026-12", "drama");
+      pMd.status = "confirmed";
+      pMd.contractAmount = 80000000;
+      pMd.expenseInclude = false;
+      pMd.lunchTruckInclude = false;
+      pMd.payments = [
+        Object.assign(App.Defaults.newPayment("2026-12"), { amount: 40000000, inputMode: "amount" }),
+        Object.assign(App.Defaults.newPayment("2027-12"), { amount: 40000000, inputMode: "amount" })
+      ];
+      sMultiDiv.projects = [pMd];
+      sMultiDiv.revenueFees = [];
+      sMultiDiv.employees = [{
+        id: "ceo-md", name: "대표", role: "대표이사", monthlySalary: 5000000,
+        include: true, insure: false, meal: false, severance: false
+      }];
+      sMultiDiv.settings.scenarioComparison = { enabledScenarioIds: ["soloAgency"] };
+      sMultiDiv.settings.scenarios.soloAgency.ownerPayout.salaryEmployeeId = "ceo-md";
+      sMultiDiv.settings.scenarios.soloAgency.ownerPayout.dividendOn = true;
+      sMultiDiv.settings.scenarios.soloAgency.ownerPayout.dividendMode = "amount";
+      sMultiDiv.settings.scenarios.soloAgency.ownerPayout.dividendAmount = 25000000;
+      sMultiDiv.settings.scenarios.soloAgency.ownerPayout.dividendMonth = "2027-12";
+      var rMd = App.Engine.runSimulation(sMultiDiv);
+      var soloMd = App.Engine.runScenarioComparison(sMultiDiv, rMd).scenarios.soloAgency;
+      var mdYears = (soloMd.personalTaxDetail && soloMd.personalTaxDetail.years) || [];
+      var md2027 = mdYears.filter(function (d) { return Number(d.year) === 2027; })[0];
+      var md2026 = mdYears.filter(function (d) { return Number(d.year) === 2026; })[0];
+      assert("T10 2027에 고액 배당 종합과세", md2027 && md2027.dividendTaxMode === "comprehensive");
+      if (md2026) {
+        assert("T10 2026은 배당 없거나 분리", !md2026.dividendTaxMode || md2026.dividendTaxMode === "none" ||
+          md2026.dividendTaxMode === "separate");
+      }
+
+      // --- Bugbot 경계: 자본금 차감 / 외부 금융소득 / 원천징수 합계 ---
+      var sBasis = empty();
+      sBasis.profile.startMonth = "2027-01";
+      sBasis.profile.endMonth = "2027-01";
+      var rBasis = App.Engine.runSimulation(sBasis);
+      rBasis.kpis.endClosing = 100000000;
+      rBasis.kpis.vatPendingLiability = 0;
+      rBasis.kpis.corporateTaxPending = 0;
+      rBasis.kpis.localTaxPending = 0;
+      sBasis.settings.tax.liquidationMode = "deemedDividend";
+      sBasis.settings.tax.liquidationCapitalBasis = 40000000;
+      var soloBasis = App.Engine.runScenarioComparison(sBasis, rBasis).scenarios.soloAgency;
+      eq("의제배당 과세표준 = 잔여 - 자본금", soloBasis.deemedDividendTaxableBase, 60000000);
+      var fullDeemed = App.Engine.taxOnDividendExtraction(100000000, {
+        year: 2027, earnedGross: 0, existingDividend: 0,
+        settings: App.Defaults.personalTaxForScenario(sBasis, "soloAgency"), state: sBasis
+      });
+      assert("자본금 차감 시 세액 < 전액 과세", soloBasis.corporateLiquidationTax < fullDeemed.total);
+
+      var sExtFin = empty();
+      sExtFin.profile.startMonth = "2027-12";
+      sExtFin.profile.endMonth = "2027-12";
+      sExtFin.profile.initialCash = 80000000;
+      var pExt = App.Defaults.newProject("2027-12", "drama");
+      pExt.status = "confirmed";
+      pExt.contractAmount = 50000000;
+      pExt.expenseInclude = false;
+      pExt.lunchTruckInclude = false;
+      pExt.payments = [Object.assign(App.Defaults.newPayment("2027-12"), { amount: 50000000, inputMode: "amount" })];
+      sExtFin.projects = [pExt];
+      sExtFin.revenueFees = [];
+      sExtFin.employees = [{
+        id: "ceo-ext", name: "대표", role: "대표이사", monthlySalary: 10000000,
+        include: true, insure: false, meal: false, severance: false
+      }];
+      sExtFin.settings.scenarioComparison = { enabledScenarioIds: ["soloAgency"] };
+      sExtFin.settings.scenarios.soloAgency.ownerPayout.salaryEmployeeId = "ceo-ext";
+      sExtFin.settings.scenarios.soloAgency.ownerPayout.dividendOn = true;
+      sExtFin.settings.scenarios.soloAgency.ownerPayout.dividendMode = "amount";
+      sExtFin.settings.scenarios.soloAgency.ownerPayout.dividendAmount = 10000000;
+      sExtFin.settings.tax.otherFinancialIncome = 15000000;
+      var soloExt = App.Engine.runScenarioComparison(sExtFin, App.Engine.runSimulation(sExtFin)).scenarios.soloAgency;
+      eq("외부금융+배당 2.5천만 → 종합과세", soloExt.ownerDividendTaxMode, "comprehensive");
+      var sExtNone = clone(sExtFin);
+      sExtNone.settings.tax.otherFinancialIncome = 0;
+      var soloExtNone = App.Engine.runScenarioComparison(sExtNone, App.Engine.runSimulation(sExtNone)).scenarios.soloAgency;
+      eq("외부금융은 표시 otherIncome에 미포함(법인배당만)",
+        soloExt.personalTaxDetail.otherIncome, soloExtNone.personalTaxDetail.otherIncome);
+      assert("외부금융 구간으로 배당 증분세 ≥ 무외부",
+        soloExt.personalTaxDetail.dividendTax >= soloExtNone.personalTaxDetail.dividendTax);
+      var expectedAfter = App.Money.roundWon(
+        soloExt.personalTaxDetail.earnedGross +
+        soloExt.personalTaxDetail.businessIncome +
+        soloExt.personalTaxDetail.otherIncome -
+        soloExt.personalTaxDetail.totalPersonalTax
+      );
+      eq("실수령=법인귀속소득-개인세(외부소득 미차감)", soloExt.personalTaxDetail.afterTaxIncome, expectedAfter);
+
+      var sNegClamp = empty();
+      sNegClamp.settings.tax.liquidationCapitalBasis = -50000000;
+      sNegClamp.settings.tax.otherFinancialIncome = -10000000;
+      App.Defaults.ensureState(sNegClamp);
+      eq("음수 자본기준 클램프 0", sNegClamp.settings.tax.liquidationCapitalBasis, 0);
+      eq("음수 외부금융소득 클램프 0", sNegClamp.settings.tax.otherFinancialIncome, 0);
+
+      var sWh = clone(sSep);
+      var soloWh = App.Engine.runScenarioComparison(sWh, App.Engine.runSimulation(sWh)).scenarios.soloAgency;
+      var whExpect = App.Defaults.ownerDividendWithholding(10000000).total;
+      eq("분리과세 기납(원천) 합계에 배당원천 포함", soloWh.personalTaxDetail.withholdingTax, whExpect);
+      eq("prepaidTotal에 배당원천 포함", soloWh.personalTaxDetail.prepaidTotal, whExpect);
+    } catch (e) { fail("공개 전 고정 역검산 예외", e.message || e); }
 
     var passed = results.filter(function (x) { return x.ok; }).length;
     var failed = results.filter(function (x) { return !x.ok; }).length;

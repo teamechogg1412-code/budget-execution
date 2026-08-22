@@ -551,11 +551,36 @@
       0.03
     );
     var divGross = Math.max(0, won(y && y.dividend));
-    var divParts = withholdingParts(
-      App.Defaults && App.Defaults.ownerDividendWithholding,
-      divGross,
-      0.14
-    );
+    var threshold = (App.Defaults && App.Defaults.financialIncomeComprehensiveThreshold)
+      ? App.Defaults.financialIncomeComprehensiveThreshold()
+      : 20000000;
+    var divParts;
+    if (divGross <= threshold) {
+      divParts = withholdingParts(
+        App.Defaults && App.Defaults.ownerDividendWithholding,
+        divGross,
+        0.14
+      );
+    } else {
+      var year = Number(y && y.year) || 2026;
+      var baseTax = App.Engine.calculatePersonalTaxDetail(salaryGross, {
+        mode: "auto",
+        year: year,
+        useLinkedIncome: true,
+        incomeType: "earned",
+        incomeSplit: { earnedGross: salaryGross, businessIncome: 0, otherIncome: 0 }
+      });
+      var withDiv = App.Engine.calculatePersonalTaxDetail(App.Money.roundWon(salaryGross + divGross), {
+        mode: "auto",
+        year: year,
+        useLinkedIncome: true,
+        incomeType: "earned",
+        incomeSplit: { earnedGross: salaryGross, businessIncome: 0, otherIncome: divGross }
+      });
+      var incr = won(Math.max(0, withDiv.totalPersonalTax - baseTax.totalPersonalTax));
+      var national = won(incr / 1.1);
+      divParts = { national: national, local: won(incr - national), total: incr };
+    }
     var salary = taxKindRow(salaryGross, salaryParts);
     var profitSettle = taxKindRow(settleGross, settleParts);
     var dividend = taxKindRow(divGross, divParts);
@@ -564,6 +589,7 @@
       salary: salary,
       profitSettle: profitSettle,
       dividend: dividend,
+      dividendTaxMode: divGross > threshold ? "comprehensive" : (divGross ? "separate" : "none"),
       gross: won(salary.gross + profitSettle.gross + dividend.gross),
       tax: won(salary.tax + profitSettle.tax + dividend.tax),
       national: won(salary.national + profitSettle.national + dividend.national),

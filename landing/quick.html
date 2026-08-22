@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quick Simulation — 1인 기획사 예산 시뮬레이터</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="css/landing.css" />
+</head>
+<body>
+  <div class="page" hidden>
+    <nav class="top-nav">
+      <a href="index.html" data-carry-ref>← 처음으로</a>
+      <a href="about.html">이 사이트를 만든 사람들</a>
+    </nav>
+
+    <div id="form-view">
+      <h1 style="font-size:20px;margin:8px 0 4px;">빠르게 비교해보기</h1>
+      <p class="section-body">7개 항목만 넣으면 대략적인 방향을 바로 확인할 수 있습니다. 입력값은 이 브라우저 안에서만 계산되며 서버로 전송되지 않습니다.</p>
+
+      <form id="quick-form">
+        <div class="card">
+          <div class="field">
+            <label for="f-work">연간 작품 수익</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="f-work" placeholder="0" />
+              <span>원</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-ad">연간 광고·기타 수익</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="f-ad" placeholder="0" />
+              <span>원</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-rate">현재 소속사 정산 비율 (내가 가져가는 비율)</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="f-rate" placeholder="예: 70" />
+              <span>%</span>
+            </div>
+            <div class="field-desc">예: 8:2 계약이면 80 입력</div>
+          </div>
+          <div class="field">
+            <label for="f-covered">현재 소속사가 대신 부담하는 비용 (연간)</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="f-covered" placeholder="0" />
+              <span>원</span>
+            </div>
+            <div class="field-desc">스타일링, 차량, 매니저 등 소속사가 지금 대신 내주는 것으로 체감되는 금액</div>
+          </div>
+          <div class="field">
+            <label for="f-headcount">1인 기획사 운영 시 예상 직원 수</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="f-headcount" placeholder="0" />
+              <span>명</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-salary">대표자(본인) 예상 월 급여</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="f-salary" placeholder="0" />
+              <span>원</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-opcost">기타 예상 운영비 (연간, 임대료·차량·진행비 등)</label>
+            <div class="unit-suffix">
+              <input type="text" inputmode="numeric" id="f-opcost" placeholder="0" />
+              <span>원</span>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">계산하기</button>
+      </form>
+    </div>
+
+    <div id="result-view" hidden>
+      <h1 style="font-size:20px;margin:8px 0 16px;">계산 결과</h1>
+
+      <div class="result-grid">
+        <div class="result-card">
+          <div class="label">현재 전속 · 세후 개인 실수령 (대략)</div>
+          <div class="value" id="r-current">-</div>
+        </div>
+        <div class="result-card">
+          <div class="label">1인 기획사 · 통제 경제가치 (대략)</div>
+          <div class="value" id="r-solo">-</div>
+        </div>
+        <div class="result-card diff">
+          <div class="label">대략 차이 (동일 지표가 아님 — 방향 참고용)</div>
+          <div class="value" id="r-diff">-</div>
+        </div>
+      </div>
+
+      <div class="verdict" id="r-verdict"></div>
+      <div class="small-print" id="r-covered-note" hidden></div>
+      <p class="small-print">Quick은 방향성 확인용입니다. 실수령·통제가치를 같은 지표끼리 보려면 <a href="contract.html" data-carry-ref>전속계약 분석</a>을 이용하세요.</p>
+
+      <a class="btn btn-primary" id="cta-detail" href="../simulator/index.html" target="_blank" rel="noopener" data-carry-ref>내 조건으로 더 자세히 계산하기</a>
+      <a class="btn btn-secondary" id="cta-reveal" href="reveal.html" data-carry-ref>상세 비교 보기</a>
+      <button type="button" class="btn btn-secondary" id="btn-restart">다시 입력하기</button>
+
+      <p class="small-print">이 결과는 방향성 확인용 대략치입니다. 세율·인건비 등은 단순화된 가정을 사용했습니다. 정확한 수치는 "더 자세히 계산하기"에서 확인하세요.</p>
+    </div>
+
+    <div class="brand-footer"><a href="about.html" data-carry-ref>누가 만들었나요?</a></div>
+  </div>
+
+  <script src="../js/money.js"></script>
+  <script src="../js/format.js"></script>
+  <script src="../js/data/personal-tax.js"></script>
+  <script src="../js/data/corporate-tax.js"></script>
+  <script src="../js/engine/tax.js"></script>
+  <script src="../js/engine/personal-tax.js"></script>
+  <script src="js/quick-engine.js"></script>
+  <script src="js/campaign-config.js"></script>
+  <script src="js/link-gate.js"></script>
+  <script src="js/visit-ping-config.js"></script>
+  <script src="js/visit-ping.js"></script>
+  <script>
+    (function () {
+      App.LinkGate.check({ expiredUrl: "expired.html" }).then(function (state) {
+        if (state !== "expired") App.VisitPing.notify("quick");
+      });
+
+      function raw(id) { return document.getElementById(id).value; }
+
+      function formatBig(n) {
+        return App.Format.formatWonAbout(n) + " (" + App.Format.formatWon(n) + ")";
+      }
+
+      document.getElementById("quick-form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var input = {
+          annualWorkIncome: raw("f-work"),
+          annualAdIncome: raw("f-ad"),
+          currentAgencyRate: raw("f-rate"),
+          currentAgencyCoveredCost: raw("f-covered"),
+          employeeCount: raw("f-headcount"),
+          ownerSalary: raw("f-salary"),
+          otherOpCost: raw("f-opcost")
+        };
+        var result = App.QuickEngine.calculate(input);
+
+        document.getElementById("r-current").textContent = formatBig(result.currentContractNet);
+        document.getElementById("r-solo").textContent = formatBig(result.soloAgencyNet);
+        var diffEl = document.getElementById("r-diff");
+        diffEl.textContent = (result.difference >= 0 ? "+ " : "") + formatBig(result.difference);
+        diffEl.className = "value " + (result.difference >= 0 ? "good" : "bad");
+
+        var verdictEl = document.getElementById("r-verdict");
+        if (result.favorable === "current") {
+          verdictEl.className = "verdict current";
+          verdictEl.textContent = "현재 입력 조건에서는 기존 전속계약을 유지하는 편이 비용 측면에서 유리합니다.";
+        } else {
+          verdictEl.className = "verdict solo";
+          verdictEl.textContent = "현재 입력 조건에서는 1인 법인 운영 시 예상 잔존 수익이 더 높습니다.";
+        }
+
+        var coveredNote = document.getElementById("r-covered-note");
+        if (result.detail.currentAgencyCoveredCost > 0) {
+          coveredNote.hidden = false;
+          coveredNote.textContent = "참고: 현재 소속사가 대신 부담 중이라고 입력하신 비용은 연 " + App.Format.formatWonAbout(result.detail.currentAgencyCoveredCost) + "입니다. 1인 기획사에서는 이런 항목도 위 운영비에 직접 반영해야 할 수 있습니다.";
+        } else {
+          coveredNote.hidden = true;
+        }
+
+        document.getElementById("form-view").hidden = true;
+        document.getElementById("result-view").hidden = false;
+        App.LinkGate.wireInternalLinks();
+        window.scrollTo(0, 0);
+      });
+
+      document.getElementById("btn-restart").addEventListener("click", function () {
+        document.getElementById("result-view").hidden = true;
+        document.getElementById("form-view").hidden = false;
+        window.scrollTo(0, 0);
+      });
+    })();
+  </script>
+</body>
+</html>

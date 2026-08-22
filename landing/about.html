@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>이 사이트를 만든 사람들 — 1인 기획사 예산 시뮬레이터</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="css/landing.css" />
+</head>
+<body>
+  <div class="page">
+    <nav class="top-nav">
+      <a href="index.html" data-carry-ref>← 처음으로</a>
+      <span></span>
+    </nav>
+
+    <h1 style="font-size:22px;margin:16px 0 24px;">이 사이트를 만든 사람들</h1>
+
+    <ul class="info-list">
+      <li><span class="k">운영 회사</span><span class="v">메리디안 컬렉티브 (Meridian Collective)</span></li>
+      <li><span class="k">대표자</span><span class="v"><!-- TODO: 대표자 성명 입력 --></span></li>
+      <li><span class="k">개발 담당</span><span class="v">임수연 · 010-2944-1650</span></li>
+      <li><span class="k">사업자등록번호</span><span class="v"><!-- TODO: 사업자등록번호 입력 --></span></li>
+      <li><span class="k">주소</span><span class="v"><!-- TODO: 사업장 주소 입력 --></span></li>
+      <li><span class="k">이메일</span><span class="v"><!-- TODO: 공식 이메일 입력 --></span></li>
+      <li><span class="k">시뮬레이터</span><span class="v">본 계산기는 메리디안 컬렉티브가 자체 개발·운영합니다.</span></li>
+    </ul>
+
+    <div class="section-title">이 사이트가 하는 일</div>
+    <p class="section-body">현재 전속계약 조건과 1인 기획사(법인) 운영 조건을 입력하면, 예상 수익·비용·세금을 계산해 비교해볼 수 있는 도구입니다. 계산 결과가 항상 한쪽에 유리하게 나오도록 설계되어 있지 않습니다 — 입력 조건에 따라 전속계약 유지가 유리하다는 결과도 그대로 보여드립니다.</p>
+
+    <div class="section-title">개인정보 처리 방침 (요약)</div>
+    <p class="section-body">- 입력하신 작품료·급여 등 실제 금액은 서버로 전송되지 않으며, 이 브라우저 안에서만 계산됩니다.
+- 이 링크(ref)가 열렸는지 여부만 운영자에게 기록됩니다. 기기 종류, 상세 접속 위치 등은 수집하지 않습니다.
+- 이 링크는 최초 오픈 후 24시간이 지나면 만료됩니다. 다시 보고 싶으시면 메리디안 컬렉티브에 문의해 주세요.
+- 문의 페이지에서 직접 입력해 제출하신 이름·연락처는 상담 목적으로만 사용됩니다.</p>
+
+    <a class="btn btn-secondary" href="contact.html" data-carry-ref>문의하기</a>
+
+    <div class="brand-footer">Developed by Meridian Collective</div>
+  </div>
+
+  <script src="js/campaign-config.js"></script>
+  <script src="js/link-gate.js"></script>
+  <script>
+    // 검증/문의 목적 페이지라 게이트 없이 항상 접근 가능해야 한다. ref가 있으면 이어붙이기만 한다.
+    App.LinkGate.wireInternalLinks();
+  </script>
+</body>
+</html>

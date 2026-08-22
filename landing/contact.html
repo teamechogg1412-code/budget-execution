@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>문의하기 — 계산 검토</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="css/landing.css" />
+</head>
+<body>
+  <div class="page">
+    <nav class="top-nav">
+      <a href="index.html" data-carry-ref>← 처음으로</a>
+      <a href="about.html" data-carry-ref>이 사이트를 만든 사람들</a>
+    </nav>
+
+    <h1 id="contact-title" style="font-size:22px;margin:16px 0 8px;">질문 남기기</h1>
+    <p id="contact-lead" class="section-body">지금 당장 어떤 결정을 할 필요는 없습니다. 아래에 남겨주시면 확인 후 연락드립니다.</p>
+
+    <form id="contact-form" class="card">
+      <div class="field">
+        <label for="c-name">이름 (선택)</label>
+        <input type="text" id="c-name" />
+      </div>
+      <div class="field">
+        <label for="c-phone">연락 방법 (전화 또는 이메일)</label>
+        <input type="text" id="c-phone" required />
+      </div>
+      <div class="field">
+        <label for="c-memo">남기고 싶은 말 (선택)</label>
+        <textarea id="c-memo" placeholder="궁금한 점이나 편한 연락 시간대를 적어주셔도 좋습니다"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">검토 요청 보내기</button>
+    </form>
+    <p class="small-print">직접 입력해 제출하신 정보만 메일로 전달됩니다. 입력 원표·상세 금액은 서버에 저장하지 않습니다.</p>
+
+    <div class="brand-footer"><a href="about.html" data-carry-ref>Meridian Collective</a></div>
+  </div>
+
+  <script src="js/campaign-config.js"></script>
+  <script src="js/link-gate.js"></script>
+  <script>
+    App.LinkGate.wireInternalLinks();
+    App.LinkGate.revealApp();
+
+    var params = new URLSearchParams(window.location.search);
+    var intent = params.get("intent") || "general";
+    if (intent === "review") {
+      document.getElementById("contact-title").textContent = "이 계산이 맞는지 검토받기";
+      document.getElementById("contact-lead").textContent =
+        "요약 문장만 함께 보낼 수 있습니다. 입력하신 원표 금액은 붙이지 않아도 됩니다.";
+      try {
+        var summary = sessionStorage.getItem("contractReviewSummary");
+        if (summary) {
+          document.getElementById("c-memo").value = summary;
+        }
+      } catch (err) {}
+    }
+
+    var CONTACT_EMAIL = "contact@meridiancollective.co.kr";
+    document.getElementById("contact-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = document.getElementById("c-name").value;
+      var phone = document.getElementById("c-phone").value;
+      var memo = document.getElementById("c-memo").value;
+      var body = "intent: " + intent + "\n이름: " + name + "\n연락처: " + phone + "\n메모:\n" + memo;
+      var subject = intent === "review"
+        ? "[전속계약 분석] 계산 검토 요청"
+        : "[1인 기획사 시뮬레이터] 문의";
+      var mailto = "mailto:" + CONTACT_EMAIL +
+        "?subject=" + encodeURIComponent(subject + (name ? " - " + name : "")) +
+        "&body=" + encodeURIComponent(body);
+      window.location.href = mailto;
+    });
+  </script>
+</body>
+</html>

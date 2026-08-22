@@ -51,13 +51,50 @@
     return "<Cell" + attrs + '><Data ss:Type="' + type + '">' + data + "</Data></Cell>";
   }
 
+  function displayLength(value) {
+    var text = String(value == null ? "" : value);
+    var length = 0;
+    for (var i = 0; i < text.length; i += 1) {
+      var code = text.charCodeAt(i);
+      length += code > 255 ? 2 : 1;
+    }
+    return length;
+  }
+
+  function cellDisplayLength(cell) {
+    if (!cell) return 0;
+    if (cell.t === "n") {
+      var value = Math.abs(App.Money.toSafeNumber(cell.v));
+      var digits = String(Math.round(value)).length;
+      return digits + Math.floor(Math.max(0, digits - 1) / 3) + (cell.v < 0 ? 1 : 0);
+    }
+    return displayLength(cell.v);
+  }
+
+  function columnXml(rows) {
+    var columnCount = (rows || []).reduce(function (max, row) {
+      return Math.max(max, (row || []).length);
+    }, 0);
+    var columns = [];
+    for (var col = 0; col < columnCount; col += 1) {
+      var maxLength = 0;
+      (rows || []).forEach(function (row) {
+        maxLength = Math.max(maxLength, cellDisplayLength((row || [])[col]));
+      });
+      // SpreadsheetML 너비는 point 단위다. 긴 설명은 폭을 제한하고 줄바꿈한다.
+      var width = Math.max(54, Math.min(300, 12 + maxLength * 6.2));
+      columns.push('<Column ss:AutoFitWidth="0" ss:Width="' + Math.round(width) + '"/>');
+    }
+    return columns.join("");
+  }
+
   function rowXml(cells) {
-    return "<Row>" + (cells || []).map(cellXml).join("") + "</Row>";
+    return '<Row ss:AutoFitHeight="1">' + (cells || []).map(cellXml).join("") + "</Row>";
   }
 
   function worksheetXml(name, rows) {
     var body = (rows || []).map(rowXml).join("");
-    return '<Worksheet ss:Name="' + xmlEscape(sheetName(name)) + '"><Table>' + body + "</Table></Worksheet>";
+    return '<Worksheet ss:Name="' + xmlEscape(sheetName(name)) + '"><Table>' + columnXml(rows) + body + "</Table></Worksheet>";
   }
 
   function blank() { return s(""); }
@@ -413,12 +450,23 @@
     return '<?xml version="1.0" encoding="UTF-8"?>' +
       '<?mso-application progid="Excel.Sheet"?>' +
       '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' +
-      ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+      ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"' +
+      ' xmlns:x="urn:schemas-microsoft-com:office:excel">' +
       "<Styles>" +
-      '<Style ss:ID="sHeader"><Font ss:Bold="1"/></Style>' +
-      '<Style ss:ID="sWon"><NumberFormat ss:Format="#,##0"/></Style>' +
-      '<Style ss:ID="sPct"><NumberFormat ss:Format="0.000%"/></Style>' +
-      '<Style ss:ID="sCheck"><Font ss:Bold="1"/></Style>' +
+      '<Style ss:ID="Default" ss:Name="Normal">' +
+      '<Alignment ss:Vertical="Center" ss:WrapText="1"/>' +
+      '<Borders>' +
+      '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9E1F2"/>' +
+      '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9E1F2"/>' +
+      '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9E1F2"/>' +
+      '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9E1F2"/>' +
+      "</Borders>" +
+      '<Font ss:FontName="Malgun Gothic" x:CharSet="129" ss:Size="10"/>' +
+      "</Style>" +
+      '<Style ss:ID="sHeader" ss:Parent="Default"><Alignment ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Malgun Gothic" x:CharSet="129" ss:Size="10" ss:Bold="1"/><Interior ss:Color="#D9EAF7" ss:Pattern="Solid"/></Style>' +
+      '<Style ss:ID="sWon" ss:Parent="Default"><Alignment ss:Horizontal="Right" ss:Vertical="Center"/><NumberFormat ss:Format="#,##0"/></Style>' +
+      '<Style ss:ID="sPct" ss:Parent="Default"><Alignment ss:Horizontal="Right" ss:Vertical="Center"/><NumberFormat ss:Format="0.000%"/></Style>' +
+      '<Style ss:ID="sCheck" ss:Parent="Default"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Malgun Gothic" x:CharSet="129" ss:Size="10" ss:Bold="1"/></Style>' +
       "</Styles>" +
       sheets.join("") +
       "</Workbook>";

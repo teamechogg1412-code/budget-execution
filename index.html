@@ -6,6 +6,11 @@
   <title>1인 기획사 설립 운영 시뮬레이션</title>
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    // 개인용 로컬 파일이라 비밀번호 게이트를 끔. 다시 켜려면 이 줄을 지우고
+    // js/access-config.js에 password를 채우면 된다.
+    window.AppPublicMode = true;
+  </script>
 </head>
 <body>
   <header class="top">
@@ -34,7 +39,7 @@
     <div id="budget-panel"></div>
     <nav class="nav">
       <button type="button" class="active" data-action="nav" data-view="dashboard">📊 대시보드</button>
-      <button type="button" data-action="nav" data-view="revenue">💰 수익</button>
+      <button type="button" data-action="nav" data-view="revenue">💰 예상수익 입력하기</button>
       <button type="button" data-action="nav" data-view="costs">💸 비용</button>
       <button type="button" data-action="nav" data-view="analysis">📈 분석</button>
       <button type="button" class="nav-warn" data-action="nav" data-view="simulation">⚙️ 시뮬레이션 설정</button>
@@ -75,6 +80,7 @@
   <script src="js/supabase-config.js"></script>
   <script src="js/telegram-config.js"></script>
   <script src="js/telegram.js"></script>
+  <script src="js/access-config.js"></script>
   <script src="js/access.js"></script>
   <script src="js/store.js"></script>
   <script src="js/remote-store.js"></script>

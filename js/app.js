@@ -131,12 +131,16 @@
     syncSetupStickyTop();
   }
 
-  var UNLOCK_KEY = "solo-agency-budget:gate-ok";
+  var UNLOCK_KEY = "solo-agency-budget:gate-ok"; // legacy — Access.SESSION_KEY 사용
 
   function markSavedLoadDone() {
     ui.savedLoadOpen = false;
     ui.unlockError = false;
-    try { sessionStorage.setItem(UNLOCK_KEY, "1"); } catch (err) {}
+    if (App.Access && App.Access.persistUnlockSession) {
+      App.Access.persistUnlockSession();
+    } else {
+      try { sessionStorage.setItem(UNLOCK_KEY, "1"); } catch (err) {}
+    }
   }
 
   function unlockFromGate() {
@@ -908,18 +912,21 @@
       renderMain();
       return;
     }
-    if (action === "payout-fit-from-recommended") {
-      App.Render.fillPayoutFitTrial(state, result, ui, "recommended");
-      if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
-      ui.analysisFoldOpen["payout-fit"] = true;
-      renderMain();
-      return;
-    }
     if (action === "toggle-payout-fit-tax") {
       var taxId = btn.getAttribute("data-id");
       if (!taxId) return;
       if (!ui.payoutFitTaxOpen) ui.payoutFitTaxOpen = {};
       ui.payoutFitTaxOpen[taxId] = !ui.payoutFitTaxOpen[taxId];
+      if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
+      ui.analysisFoldOpen["payout-fit"] = true;
+      renderMain();
+      return;
+    }
+    if (action === "toggle-payout-fit-section") {
+      var sectionId = btn.getAttribute("data-id");
+      if (!sectionId) return;
+      if (!ui.payoutFitSectionOpen) ui.payoutFitSectionOpen = {};
+      ui.payoutFitSectionOpen[sectionId] = !ui.payoutFitSectionOpen[sectionId];
       if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
       ui.analysisFoldOpen["payout-fit"] = true;
       renderMain();
@@ -1396,6 +1403,13 @@
       ui.workItemOpen[editId] = true;
       renderMain();
       return;
+    } else if (action === "toggle-work-ops") {
+      var opsId = btn.getAttribute("data-id");
+      if (!opsId) return;
+      if (!ui.workOpsOpen) ui.workOpsOpen = {};
+      ui.workOpsOpen[opsId] = !ui.workOpsOpen[opsId];
+      renderMain();
+      return;
     } else if (action === "copy-project") {
       var source = findProjectById(btn.getAttribute("data-id"));
       if (!source) return;
@@ -1633,7 +1647,13 @@
       if (viewQ) ui.view = viewQ;
     } catch (err) {}
     try {
-      ui.savedLoadOpen = sessionStorage.getItem(UNLOCK_KEY) !== "1";
+      if (App.Access && App.Access.isPublicMode && App.Access.isPublicMode()) {
+        ui.savedLoadOpen = false;
+      } else if (App.Access && App.Access.hasValidSession) {
+        ui.savedLoadOpen = !App.Access.hasValidSession();
+      } else {
+        ui.savedLoadOpen = sessionStorage.getItem(UNLOCK_KEY) !== "1";
+      }
     } catch (err) {
       ui.savedLoadOpen = true;
     }

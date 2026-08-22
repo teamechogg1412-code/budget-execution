@@ -1275,8 +1275,8 @@
     var evDelta = App.Money.roundWon((cmp.deltas || {}).controlledEconomicValue);
     var html = '<div class="card"><h2>1인 기획사 vs 기존 회사 전속</h2>';
     html += '<div class="dash-metrics">';
-    html += dashMetric("1인 기획사 경제가치", soloEV, "hero" + (evDelta >= 0 ? " good" : ""));
-    html += dashMetric("기존 회사 전속 경제가치", exEV);
+    html += dashMetric("1인 기획사 통제 경제가치", soloEV, "hero" + (evDelta >= 0 ? " good" : ""));
+    html += dashMetric("기존 회사 전속 통제 경제가치", exEV);
     html += dashMetric("차이(1인 − 전속)", evDelta, evDelta >= 0 ? "good" : "bad");
     html += "</div></div>";
     return html;
@@ -1562,7 +1562,7 @@
         if (included) grand += amt;
         var pctVal = Math.round(App.Money.toSafeNumber(fee.rate) * 10000) / 100;
         html += "<tr" + (included ? "" : ' class="muted"') + ">";
-        html += "<td>" + textInput(prefix + "name", fee.name, 'placeholder="예: 써니스"') + "</td>";
+        html += "<td>" + textInput(prefix + "name", fee.name, 'placeholder="예: 법인 운영·관리비"') + "</td>";
         html += "<td>" + selectInput(prefix + "revenueScope", fee.revenueScope || fee.basis || "totalRevenue", revenueScopeOptions()) + "</td>";
         html += '<td class="num fee-rate-cell">' + percentInput(prefix + "rate", pctVal, 'data-kind="fee-rate"', "compact-pct") + "</td>";
         html += "<td>" + selectInput(prefix + "category", fee.category, feeCategoryOptions()) + "</td>";
@@ -2000,7 +2000,7 @@
   function ownerPayoutTaxLabel(solo, detail) {
     if (detail && detail.payoutTaxLabel) return detail.payoutTaxLabel;
     if (solo && solo.ownerPayoutTaxLabel) return solo.ownerPayoutTaxLabel;
-    return "배당소득세 (15.4%)";
+    return "배당소득 분리과세 (15.4%)";
   }
 
   function burdenOptions() {
@@ -2033,7 +2033,7 @@
         '<div class="field"><label>개인세금</label><div class="readonly-val">누진세율 자동</div></div>' +
         '<div class="field"><label>귀속연도</label><div class="readonly-val">' +
         esc(opts.yearText || "시뮬 기간 자동") + "</div></div></div>" +
-        '<p class="muted small">근로소득은 누진세율로 계산하고, 배당은 배당소득세 15.4%, 수익배분은 사업소득세·주민세 3.3%를 더합니다. 귀속연도는 시뮬레이션 기간에서 자동입니다.</p>';
+        '<p class="muted small">근로소득은 누진세율로 계산합니다. 배당은 연 2,000만원 이하면 분리과세 15.4%, 초과면 금융소득종합과세(시뮬레이션)로 근로·사업소득과 합산합니다. 배당세액공제 등 정밀특례는 반영하지 않습니다. 수익배분은 사업소득세·주민세 3.3%를 더합니다. 귀속연도는 시뮬레이션 기간에서 자동입니다.</p>';
     }
     var html = '<div class="row-fields">';
     html += '<div class="field"><label>개인세금 방식</label>' +
@@ -2053,7 +2053,7 @@
         selectInput("settings.personalTaxCommon.year", String(year), taxYearOptions()) + "</div>";
     }
     html += "</div>";
-    html += '<p class="muted small">자동 계산 시 1인 기획사는 대표 급여의 근로소득세에, 배당이면 배당소득세 15.4%, 수익배분이면 사업소득세 3.3%를 더합니다. 수동 세액을 고르면 입력값이 우선합니다.</p>';
+    html += '<p class="muted small">자동 계산 시 1인 기획사는 대표 급여의 근로소득세에, 배당은 연 2,000만원 초과 시 금융소득종합과세(시뮬레이션), 수익배분이면 사업소득세 3.3%를 더합니다. 수동 세액을 고르면 입력값이 우선합니다.</p>';
     return html;
   }
 
@@ -2148,7 +2148,7 @@
           moneyInput("settings.scenarios.soloAgency.ownerPayout.dividendAmount", App.Money.roundWon(solo.ownerPayout.dividendAmount)) + "</div>";
         html += "</div>";
       }
-      html += '<p class="muted small">연도는 시뮬레이션 기간에서 자동입니다. 그 해 영업이익이 플러스일 때만 비율을 곱하고, 다음 해 3월에 지급합니다. 시뮬이 그 전에 끝나면 마지막 달에 지급합니다. 적자면 0원입니다. 배당소득세·주민세 원천징수 15.4%입니다. 손익비용이 아니라 이익잉여금 인출입니다.</p>';
+      html += '<p class="muted small">연도는 시뮬레이션 기간에서 자동입니다. 그 해 영업이익이 플러스일 때만 비율을 곱하고, 다음 해 3월에 지급합니다. 시뮬이 그 전에 끝나면 마지막 달에 지급합니다. 적자면 0원입니다. 배당은 연 2,000만원 이하면 분리과세 15.4%, 초과면 금융소득종합과세(시뮬레이션)입니다. 손익비용이 아니라 이익잉여금 인출입니다.</p>';
     }
     var resolvedShare = App.Defaults.resolveOwnerProfitShare
       ? App.Defaults.resolveOwnerProfitShare(state, (result && result.months) || [])
@@ -2197,9 +2197,24 @@
         html += '<p class="muted small">출처: ' + esc(shareExpenseInfo.source) + "</p>";
       }
     }
-    html += '<div class="field" style="max-width:220px"><label>법인 잔여현금 청산(인출) 세율</label>' +
-      percentInput("settings.tax.liquidationTaxRate", pctView(state.settings.tax.liquidationTaxRate), 'data-kind="percent"') + "</div>";
-    html += '<p class="muted small">법인에 남는 현금을 나중에 배당·급여 등으로 개인화할 때 드는 세금의 단순 가정 세율입니다(기본 15.4% = 배당소득세 원천징수율). 실제 청산소득 법인세 등 별도 규정은 반영하지 않습니다.</p>';
+    var liqMode = (state.settings.tax && state.settings.tax.liquidationMode) === "deemedDividend"
+      ? "deemedDividend"
+      : "assumedRate";
+    html += '<div class="field" style="max-width:280px"><label>청산·즉시 개인화 방식</label>' +
+      selectInput("settings.tax.liquidationMode", liqMode, [
+        { id: "assumedRate", label: "청산 가정세율" },
+        { id: "deemedDividend", label: "의제배당 (시뮬레이션)" }
+      ]) + "</div>";
+    if (liqMode === "assumedRate") {
+      html += '<div class="field" style="max-width:220px"><label>청산 가정세율</label>' +
+        percentInput("settings.tax.liquidationTaxRate", pctView(state.settings.tax.liquidationTaxRate), 'data-kind="percent"') + "</div>";
+    } else {
+      html += '<div class="field" style="max-width:260px"><label>취득가·납입자본금 차감 (의제배당)</label>' +
+        moneyInput("settings.tax.liquidationCapitalBasis", state.settings.tax.liquidationCapitalBasis) + "</div>";
+    }
+    html += '<div class="field" style="max-width:260px"><label>외부 금융소득 (이자·배당 등, 연간)</label>' +
+      moneyInput("settings.tax.otherFinancialIncome", state.settings.tax.otherFinancialIncome) + "</div>";
+    html += '<p class="muted small">법인 잔여현금을 지금 개인에게 넘긴다고 가정할 때의 시뮬레이션입니다. 가정세율은 단순 비율(기본 15.4%)이고, 의제배당은 (잔여현금 − 취득가·납입자본금)만 과세합니다. 외부 금융소득은 2천만 종합과세 판정·합산에 쓰입니다. 실제 청산·세액은 달라질 수 있으며 법률상 확정세가 아닙니다.</p>';
     html += "<h3>개인세금</h3>";
     html += renderPersonalTaxFields(
       "settings.scenarios.soloAgency.personalTax",
@@ -2603,14 +2618,19 @@
     } else if (project.status && project.status !== "expected") {
       html += statusBadge(project.status, workStatusLabel(project.status));
     }
-    html += '<span class="work-ops">';
+    var opsOpen = !isDraft && !!(ui && ui.workOpsOpen && ui.workOpsOpen[project.id]);
+    html += '<span class="work-ops' + (opsOpen ? " open" : "") + '">';
     if (isDraft) {
       html += '<button type="button" class="btn primary" data-action="save-revenue-draft">저장</button>';
       html += '<button type="button" class="btn" data-action="cancel-revenue-draft">취소</button>';
     } else {
+      html += '<button type="button" class="btn work-ops-toggle" data-action="toggle-work-ops" data-id="' +
+        esc(project.id) + '" aria-expanded="' + (opsOpen ? "true" : "false") + '" aria-label="수정·복사·삭제">⋯</button>';
+      html += '<span class="work-ops-extra">';
       html += '<button type="button" class="btn" data-action="edit-project" data-id="' + esc(project.id) + '">수정</button>';
       html += '<button type="button" class="btn" data-action="copy-project" data-id="' + esc(project.id) + '">복사</button>';
       html += '<button type="button" class="btn danger" data-action="remove-project" data-index="' + pi + '">삭제</button>';
+      html += "</span>";
     }
     html += "</span></span>";
     html += "</div></summary>";
@@ -2776,6 +2796,7 @@
     html += '<button type="button" class="btn primary" data-action="add-revenue">+ 수익 추가</button>';
     html += "</div>";
     html += '<p class="muted small">왼쪽 금액이 오른쪽 작품·영업 소계로 모입니다. 수정·복사·삭제는 각 행에서 하고, 복사본은 저장해야 합계에 반영됩니다.</p>';
+    html += '<p class="example-warning">* 계약금액·진행비 비율·헤메·식대 배율은 예시 가정값입니다. 실제 조건에 맞게 직접 수정해서 쓰세요.</p>';
     html += renderRevenueGapBanner(revenueGapOf(state, result));
     html += renderRevenueLedger(state, result, ui);
     html += "</div>";
@@ -3615,6 +3636,7 @@
         '" data-action="cost-tab" data-tab="' + t.id + '">' + esc(t.label) + "</button>";
     });
     html += "</div>";
+    html += '<p class="example-warning">* 급여·임대료·차량비 등 아래 금액은 예시 가정값입니다. 실제 조건에 맞게 직접 수정해서 쓰세요.</p>';
     if (tab !== "rent2f") {
       html += '<div class="cost-toolbar">';
       html += '<button type="button" class="btn" data-action="expand-cost-all">전체 펼치기</button>';
@@ -4420,7 +4442,7 @@
     html += analysisFact("1인 − 전속", analysisDisplayAmount(delta, "delta"), {
       pos: delta > 0,
       neg: delta < 0,
-      title: "1인 기획사 경제가치 − 기존 회사 전속 경제가치"
+      title: "1인 기획사 통제 경제가치 − 기존 회사 전속 통제 경제가치"
     });
     html += "</div>";
     return html;
@@ -4500,8 +4522,8 @@
     scenarios.forEach(function (s) { html += "<th>" + s.multiplier + "배</th>"; });
     html += "</tr></thead><tbody>";
     html += row("총매출", function (s) { return s.revenue; }, { strong: true });
-    html += row("1인 기획사 경제가치", function (s) { return s.solo; });
-    html += row("기존 회사 전속 경제가치", function (s) { return s.exclusive; });
+    html += row("1인 기획사 통제 경제가치", function (s) { return s.solo; });
+    html += row("기존 회사 전속 통제 경제가치", function (s) { return s.exclusive; });
     html += row("차이(1인 − 전속)", function (s) { return s.delta; }, { strong: true, delta: true });
     html += "</tbody></table></div>";
     html += '<div class="mult-cards">';
@@ -4514,8 +4536,8 @@
           '</span><b' + (v < 0 ? ' class="is-neg"' : "") + ">" + text + "</b></div>";
       }
       cardRow("총매출", s.revenue, { strong: true });
-      cardRow("1인 기획사 경제가치", s.solo);
-      cardRow("기존 회사 전속 경제가치", s.exclusive);
+      cardRow("1인 기획사 통제 경제가치", s.solo);
+      cardRow("기존 회사 전속 통제 경제가치", s.exclusive);
       cardRow("차이(1인 − 전속)", s.delta, { strong: true, delta: true });
       html += "</div>";
     });
@@ -4742,6 +4764,25 @@
       "</div>";
   }
 
+  function payoutFitSectionOpen(ui, id, featureOn) {
+    var map = ui && ui.payoutFitSectionOpen;
+    if (map && Object.prototype.hasOwnProperty.call(map, id)) return !!map[id];
+    // 미설정: 켜진 항목은 펼침, 꺼진 항목은 접힘
+    return !!featureOn;
+  }
+
+  function payoutFitSectionFoldRow(id, label, summary, ui) {
+    var open = payoutFitSectionOpen(ui, id);
+    return '<div class="payout-fit-split-row payout-fit-section-fold">' +
+      '<div class="payout-fit-row-label">' +
+      '<button type="button" class="payout-fit-section-fold-btn' + (open ? " is-open" : "") +
+      '" data-action="toggle-payout-fit-section" data-id="' + esc(id) +
+      '" aria-expanded="' + (open ? "true" : "false") + '">' +
+      '<span class="chev" aria-hidden="true"></span>' + esc(label) +
+      (summary ? '<span class="payout-fit-section-summary">' + esc(summary) + "</span>" : "") +
+      "</button></div></div>";
+  }
+
   function payoutFitSplitCell(innerHtml, cls) {
     return '<div class="payout-fit-year-cell' + (cls ? " " + cls : "") + '">' + innerHtml + "</div>";
   }
@@ -4772,6 +4813,10 @@
   }
 
   function renderPayoutFitSplitTrial(trialIn, trial, trialYears, ui) {
+    var settleOn = !!(trial.profitSettleOn);
+    var divOn = !!(trial.dividendOn);
+    var settleOpen = payoutFitSectionOpen(ui, "profitSettle", settleOn);
+    var divOpen = payoutFitSectionOpen(ui, "dividend", divOn);
     var html = '<div class="payout-fit-split" style="--payout-fit-years:' + trialYears.length + '">';
     html += payoutFitSplitHead(trialYears);
     html += payoutFitSplitLabeledRow("월 급여", trialYears.map(function (y) {
@@ -4785,58 +4830,79 @@
     html += '<div class="payout-fit-split-total" data-computed="payout-fit-salary-years">';
     html += taxResultLine("기간 급여", App.Format.formatWon(trial.salaryInc), { key: true });
     html += "</div>";
-    html += payoutFitSplitToggleRow(
+
+    html += payoutFitSectionFoldRow(
+      "profitSettle",
       "수익배분",
-      payoutFitOnOff(
-        "profitSettleOn",
-        trialIn.profitSettleOn != null ? trialIn.profitSettleOn : trial.profitSettleOn,
-        "설계함",
-        "설계안함"
-      )
+      settleOn ? ("설계함 · " + pctView(trial.profitSettleRate) + "%") : "설계안함",
+      ui
     );
-    if (trial.profitSettleOn) {
-      html += payoutFitSplitLabeledRow("요율", trialYears.map(function (y) {
-        return payoutFitSplitCell(
-          payoutFitPercentInput(
-            "profitSettleRate." + y.year,
-            payoutFitYearRate(trialIn.profitSettleRateByYear, y.year, trialIn.profitSettleRate),
-            y.year + " 수익배분 요율"
-          ) +
-          '<b class="payout-fit-year-amt" data-computed="payout-fit-amt-settle-' + y.year + '">' +
-            esc(App.Format.formatWon(y.profitSettle)) + "</b>"
-        );
-      }).join(""));
+    if (settleOpen) {
+      html += payoutFitSplitToggleRow(
+        "",
+        payoutFitOnOff(
+          "profitSettleOn",
+          trialIn.profitSettleOn != null ? trialIn.profitSettleOn : trial.profitSettleOn,
+          "설계함",
+          "설계안함"
+        )
+      );
+      if (settleOn) {
+        html += payoutFitSplitLabeledRow("요율", trialYears.map(function (y) {
+          return payoutFitSplitCell(
+            payoutFitPercentInput(
+              "profitSettleRate." + y.year,
+              payoutFitYearRate(trialIn.profitSettleRateByYear, y.year, trialIn.profitSettleRate),
+              y.year + " 수익배분 요율"
+            ) +
+            '<b class="payout-fit-year-amt" data-computed="payout-fit-amt-settle-' + y.year + '">' +
+              esc(App.Format.formatWon(y.profitSettle)) + "</b>"
+          );
+        }).join(""));
+      }
     }
-    html += payoutFitSplitToggleRow(
+
+    html += payoutFitSectionFoldRow(
+      "dividend",
       "배당",
-      payoutFitOnOff("dividendOn", trialIn.dividendOn != null ? trialIn.dividendOn : trial.dividendOn)
+      divOn ? ("반영함 · " + pctView(trial.dividendRate) + "%") : "반영안함",
+      ui
     );
-    html += '<div data-computed="payout-fit-op-years">';
-    html += payoutFitSplitLabeledRow("영업이익", trialYears.map(function (y) {
-      return payoutFitSplitCell(
-        '<b class="payout-fit-year-amt payout-fit-year-amt-tight" data-computed="payout-fit-amt-op-' + y.year + '">' +
-          esc(App.Format.formatWon(y.operatingProfit)) + "</b>"
+    if (divOpen) {
+      html += payoutFitSplitToggleRow(
+        "",
+        payoutFitOnOff("dividendOn", trialIn.dividendOn != null ? trialIn.dividendOn : trial.dividendOn)
       );
-    }).join(""), "is-mute");
-    html += "</div>";
-    html += payoutFitSplitLabeledRow("요율", trialYears.map(function (y) {
-      return payoutFitSplitCell(
-        payoutFitPercentInput(
-          "dividendRate." + y.year,
-          payoutFitYearRate(
-            trialIn.dividendRateByYear,
-            y.year,
-            trialIn.dividendRate != null ? trialIn.dividendRate : trial.dividendRate
-          ),
-          y.year + " 배당 요율"
-        ) +
-        '<b class="payout-fit-year-amt" data-computed="payout-fit-amt-div-' + y.year + '">' +
-          esc(App.Format.formatWon(y.dividend)) + "</b>"
-      );
-    }).join(""));
-    html += '<div class="payout-fit-split-total" data-computed="payout-fit-div-years">';
-    html += taxResultLine("배당액", App.Format.formatWon(trial.dividend), { key: true });
-    html += "</div>";
+      if (divOn) {
+        html += '<div data-computed="payout-fit-op-years">';
+        html += payoutFitSplitLabeledRow("영업이익", trialYears.map(function (y) {
+          return payoutFitSplitCell(
+            '<b class="payout-fit-year-amt payout-fit-year-amt-tight" data-computed="payout-fit-amt-op-' + y.year + '">' +
+              esc(App.Format.formatWon(y.operatingProfit)) + "</b>"
+          );
+        }).join(""), "is-mute");
+        html += "</div>";
+        html += payoutFitSplitLabeledRow("요율", trialYears.map(function (y) {
+          return payoutFitSplitCell(
+            payoutFitPercentInput(
+              "dividendRate." + y.year,
+              payoutFitYearRate(
+                trialIn.dividendRateByYear,
+                y.year,
+                trialIn.dividendRate != null ? trialIn.dividendRate : trial.dividendRate
+              ),
+              y.year + " 배당 요율"
+            ) +
+            '<b class="payout-fit-year-amt" data-computed="payout-fit-amt-div-' + y.year + '">' +
+              esc(App.Format.formatWon(y.dividend)) + "</b>"
+          );
+        }).join(""));
+        html += '<div class="payout-fit-split-total" data-computed="payout-fit-div-years">';
+        html += taxResultLine("배당액", App.Format.formatWon(trial.dividend), { key: true });
+        html += "</div>";
+      }
+    }
+
     html += '<div data-computed="payout-fit-tax-years">';
     html += renderPayoutFitTaxYearsRow(trial, ui);
     html += "</div>";
@@ -4939,13 +5005,6 @@
       html += '<div class="payout-fit-split-row is-total payout-fit-tax-grand">';
       html += '<div class="payout-fit-row-label">전체 합계</div>';
       html += '<div class="payout-fit-year-cell payout-fit-tax-grand-cell">';
-      html += '<div class="payout-fit-tax-grand-eq">';
-      years.forEach(function (yt, i) {
-        if (i) html += "<span>+</span>";
-        html += "<b>" + esc(App.Format.formatWon(yt.net)) + "</b>";
-      });
-      html += "<span>=</span><b class=\"is-sum\">" + esc(App.Format.formatWon(grand.net)) + "</b>";
-      html += "</div>";
       html += '<div class="payout-fit-tax-one payout-fit-tax-one-head"><span>금액</span><span>세금</span><span>세후</span></div>';
       html += payoutFitTaxOneLine(grand);
       html += "</div></div>";
@@ -4964,6 +5023,20 @@
     var mapped = payoutFitYearMapGet(map, year, null);
     if (mapped != null) return App.Money.toRatio(mapped);
     return App.Money.toRatio(fallback);
+  }
+
+  function payoutFitRemainingSummary(trial) {
+    return (trial.slack < 0 ? "초과 " : "남음 ") + App.Format.formatWon(Math.abs(trial.slack));
+  }
+
+  function renderPayoutFitPoolUsage(trial) {
+    var html = taxResultLine("기간 급여", App.Format.formatWon(trial.salaryInc));
+    html += taxResultLine("수익배분", App.Format.formatWon(trial.profitSettle));
+    html += taxResultLine("배당", App.Format.formatWon(trial.dividend));
+    html += taxResultLine("보험·퇴직 회사부담", App.Format.formatWon(trial.insurance + trial.severance), { mute: true });
+    html += taxResultLine("대표 인출·부담 합계", App.Format.formatWon(trial.ownerCompanyCost), { key: true });
+    html += taxResultLine(trial.slack < 0 ? "초과" : "남은 가용재원", App.Format.formatWon(Math.abs(trial.slack)), { total: true });
+    return html;
   }
 
   function renderAnalysisPayoutFitView(state, result, ui) {
@@ -4985,36 +5058,23 @@
     html += renderPayoutFitVerdictTag(trial.verdict);
     html += "</div>";
     if (ui && ui.payoutFitHelpOpen) html += renderPayoutFitHelpModal(fit);
-    var cur = fit.current;
-    var curYears = cur.years || [];
     html += '<div class="payout-fit-grid">';
     html += '<section class="scenario-block"><h4>한도</h4>';
     html += taxResultLine("매출", App.Format.formatWon(fit.revenue));
-    html += taxResultLine("운영원가", App.Format.formatWon(fit.operatingCost));
+    html += taxResultLine("대표 보수 전 운영원가", App.Format.formatWon(fit.operatingCost));
     html += taxResultLine("가용재원", App.Format.formatWon(fit.pool), { key: true });
     if (fit.pool < 0) html += taxResultLine("인출 한도", App.Format.formatWon(fit.poolLimit), { total: true });
-    html += "</section>";
-    html += '<section class="scenario-block"><h4>지금</h4>';
-    html += taxResultLine("월 급여", App.Format.formatWon(cur.monthlySalary));
-    html += taxResultLine("연봉", App.Format.formatWon(cur.annualSalary), { mute: true });
-    html += renderPayoutFitYearLines(curYears, "salary");
-    html += taxResultLine("기간 급여", App.Format.formatWon(cur.salary + cur.incentive), { key: true });
-    html += taxResultLine("수익배분", cur.profitSettleOn
-      ? ("설계함 · " + pctView(cur.profitSettleRate) + "%")
-      : "설계안함");
-    if (cur.profitSettleOn) {
-      html += taxResultLine("수익배분 금액", App.Format.formatWon(cur.profitSettle));
-      html += renderPayoutFitYearLines(curYears, "profitSettle");
+    var usageOpen = payoutFitSectionOpen(ui, "payoutSummary", true);
+    html += '<div class="payout-fit-section payout-fit-pool-usage">';
+    html += '<button type="button" class="payout-fit-section-fold-btn' + (usageOpen ? " is-open" : "") +
+      '" data-action="toggle-payout-fit-section" data-id="payoutSummary" aria-expanded="' +
+      (usageOpen ? "true" : "false") + '"><span class="chev" aria-hidden="true"></span>대표 인출 반영' +
+      '<span class="payout-fit-section-summary" data-computed="payout-fit-pool-summary">' +
+      esc(payoutFitRemainingSummary(trial)) + "</span></button>";
+    if (usageOpen) {
+      html += '<div data-computed="payout-fit-pool-usage">' + renderPayoutFitPoolUsage(trial) + "</div>";
     }
-    html += taxResultLine("배당", cur.dividendOn
-      ? ("반영함 · " + pctView(cur.dividendRate) + "%")
-      : "반영안함");
-    if (cur.dividendOn) {
-      html += taxResultLine("배당액", App.Format.formatWon(cur.dividend));
-      html += renderPayoutFitYearLines(curYears, "dividend");
-    }
-    html += taxResultLine("회사 부담", App.Format.formatWon(cur.ownerCompanyCost), { key: true });
-    html += taxResultLine(fit.slack < 0 ? "초과" : "여유", App.Format.formatWon(fit.slack), { total: true });
+    html += "</div>";
     html += "</section>";
     html += '<section class="scenario-block payout-fit-trial"><h4>넣어보기</h4>';
     html += '<p class="payout-fit-trial-lead">대표(배우) 보수는 보통 이렇게 넣습니다.</p>';
@@ -5028,39 +5088,67 @@
     if (splitYears) {
       html += renderPayoutFitSplitTrial(trialIn, trial, trialYears, ui);
     } else {
+      var settleOn1 = !!trial.profitSettleOn;
+      var divOn1 = !!trial.dividendOn;
+      var settleOpen1 = payoutFitSectionOpen(ui, "profitSettle", settleOn1);
+      var divOpen1 = payoutFitSectionOpen(ui, "dividend", divOn1);
       html += '<div class="payout-fit-field"><label>월 급여</label>' +
         payoutFitMoneyInput("monthlySalary", trialIn.monthlySalary != null ? trialIn.monthlySalary : trial.monthlySalary) + "</div>";
       html += '<div data-computed="payout-fit-salary-years">';
       html += renderPayoutFitYearLines(trialYears, "salary");
       html += taxResultLine("기간 급여", App.Format.formatWon(trial.salaryInc), { key: true });
       html += "</div>";
-      html += '<div class="payout-fit-field"><label>수익배분</label>' +
-        payoutFitOnOff(
-          "profitSettleOn",
-          trialIn.profitSettleOn != null ? trialIn.profitSettleOn : trial.profitSettleOn,
-          "설계함",
-          "설계안함"
-        ) + "</div>";
-      if (trial.profitSettleOn) {
-        html += '<div class="payout-fit-field"><label>수익배분 요율</label>' +
-          payoutFitPercentInput("profitSettleRate", trialIn.profitSettleRate) + "</div>";
-        html += '<div class="payout-fit-field"><label>수익배분 금액</label>' +
-          payoutFitMoneyInput("profitSettle", trialIn.profitSettle) + "</div>";
+
+      html += '<div class="payout-fit-section">';
+      html += '<button type="button" class="payout-fit-section-fold-btn' + (settleOpen1 ? " is-open" : "") +
+        '" data-action="toggle-payout-fit-section" data-id="profitSettle" aria-expanded="' +
+        (settleOpen1 ? "true" : "false") + '"><span class="chev" aria-hidden="true"></span>수익배분' +
+        '<span class="payout-fit-section-summary">' +
+        esc(settleOn1 ? ("설계함 · " + pctView(trial.profitSettleRate) + "%") : "설계안함") +
+        "</span></button>";
+      if (settleOpen1) {
+        html += '<div class="payout-fit-field"><label>수익배분</label>' +
+          payoutFitOnOff(
+            "profitSettleOn",
+            trialIn.profitSettleOn != null ? trialIn.profitSettleOn : trial.profitSettleOn,
+            "설계함",
+            "설계안함"
+          ) + "</div>";
+        if (settleOn1) {
+          html += '<div class="payout-fit-field"><label>수익배분 요율</label>' +
+            payoutFitPercentInput("profitSettleRate", trialIn.profitSettleRate) + "</div>";
+          html += '<div class="payout-fit-field"><label>수익배분 금액</label>' +
+            payoutFitMoneyInput("profitSettle", trialIn.profitSettle) + "</div>";
+          html += '<div data-computed="payout-fit-settle-years">';
+          html += renderPayoutFitYearLines(trialYears, "profitSettle");
+          html += "</div>";
+        }
       }
-      html += '<div data-computed="payout-fit-settle-years">';
-      html += renderPayoutFitYearLines(trialYears, "profitSettle");
       html += "</div>";
-      html += '<div class="payout-fit-field"><label>배당</label>' +
-        payoutFitOnOff("dividendOn", trialIn.dividendOn != null ? trialIn.dividendOn : trial.dividendOn) + "</div>";
-      html += '<div data-computed="payout-fit-op">';
-      html += taxResultLine("영업이익", App.Format.formatWon(trial.operatingProfit), { key: true });
-      html += renderPayoutFitYearLines(trialYears, "operatingProfit");
-      html += "</div>";
-      html += '<div class="payout-fit-field"><label>배당 요율</label>' +
-        payoutFitPercentInput("dividendRate", trialIn.dividendRate != null ? trialIn.dividendRate : trial.dividendRate) + "</div>";
-      html += '<div data-computed="payout-fit-div-years">';
-      html += taxResultLine("배당액", App.Format.formatWon(trial.dividend), { key: true });
-      html += renderPayoutFitYearLines(trialYears, "dividend");
+
+      html += '<div class="payout-fit-section">';
+      html += '<button type="button" class="payout-fit-section-fold-btn' + (divOpen1 ? " is-open" : "") +
+        '" data-action="toggle-payout-fit-section" data-id="dividend" aria-expanded="' +
+        (divOpen1 ? "true" : "false") + '"><span class="chev" aria-hidden="true"></span>배당' +
+        '<span class="payout-fit-section-summary">' +
+        esc(divOn1 ? ("반영함 · " + pctView(trial.dividendRate) + "%") : "반영안함") +
+        "</span></button>";
+      if (divOpen1) {
+        html += '<div class="payout-fit-field"><label>배당</label>' +
+          payoutFitOnOff("dividendOn", trialIn.dividendOn != null ? trialIn.dividendOn : trial.dividendOn) + "</div>";
+        if (divOn1) {
+          html += '<div data-computed="payout-fit-op">';
+          html += taxResultLine("영업이익", App.Format.formatWon(trial.operatingProfit), { key: true });
+          html += renderPayoutFitYearLines(trialYears, "operatingProfit");
+          html += "</div>";
+          html += '<div class="payout-fit-field"><label>배당 요율</label>' +
+            payoutFitPercentInput("dividendRate", trialIn.dividendRate != null ? trialIn.dividendRate : trial.dividendRate) + "</div>";
+          html += '<div data-computed="payout-fit-div-years">';
+          html += taxResultLine("배당액", App.Format.formatWon(trial.dividend), { key: true });
+          html += renderPayoutFitYearLines(trialYears, "dividend");
+          html += "</div>";
+        }
+      }
       html += "</div>";
     }
     html += '<div data-computed="payout-fit-lines">';
@@ -5075,7 +5163,6 @@
     html += '<div class="payout-fit-actions">';
     html += '<button type="button" class="btn" data-action="payout-fit-apply">이 값으로 계산하기</button>';
     html += '<button type="button" class="btn btn-quiet" data-action="payout-fit-revert">기존값으로 되돌리기</button>';
-    html += '<button type="button" class="btn btn-quiet" data-action="payout-fit-from-recommended">추천 값으로</button>';
     html += "</div>";
     html += "</section>";
     html += "</div>";
@@ -5106,6 +5193,10 @@
     var fit = App.Engine.analyzeOwnerPayoutFit(ctx.state, ctx.result);
     if (!fit) return;
     var trial = App.Engine.evaluateOwnerPayoutTrial(fit, payoutFitTrialOf(ui, fit));
+    var poolUsage = card.querySelector("[data-computed='payout-fit-pool-usage']");
+    if (poolUsage) poolUsage.innerHTML = renderPayoutFitPoolUsage(trial);
+    var poolSummary = card.querySelector("[data-computed='payout-fit-pool-summary']");
+    if (poolSummary) poolSummary.textContent = payoutFitRemainingSummary(trial);
     var salaryYears = card.querySelector("[data-computed='payout-fit-salary-years']");
     if (salaryYears) {
       var splitYears = (trial.years || []).length >= 2;
@@ -5246,6 +5337,8 @@
         trial.dividendRateByYear = payoutFitCopyToYears(trial.dividendRateByYear, years, trial.dividendRate);
       }
       if (!trial.dividendOn) trial.dividend = 0;
+      if (!ui.payoutFitSectionOpen) ui.payoutFitSectionOpen = {};
+      ui.payoutFitSectionOpen.dividend = true;
     }
     if (key === "profitSettleOn") {
       trial.profitSettleOn = value === true || value === 1 || value === "1";
@@ -5254,6 +5347,8 @@
         trial.profitSettle = App.Money.roundWon(fit.revenue * trial.profitSettleRate);
         trial.profitSettleRateByYear = payoutFitCopyToYears(trial.profitSettleRateByYear, years, trial.profitSettleRate);
       }
+      if (!ui.payoutFitSectionOpen) ui.payoutFitSectionOpen = {};
+      ui.payoutFitSectionOpen.profitSettle = true;
     }
     if (key === "dividendRate") {
       trial.dividendRate = Math.max(0, App.Money.toSafeNumber(value));
@@ -5331,8 +5426,8 @@
     html += "</div>";
     html += '<div class="app-modal-body">';
     html += '<section class="app-modal-section">';
-    html += '<p class="app-modal-note">법인을 지금 정리할 경우 예상 세금입니다.</p>';
-    html += '<p class="app-modal-note">잔여현금을 청산세율만큼 내고 전액 인출한다는 단순 가정이며, 실제로는 급여·배당으로 나눠 빼 세율을 낮출 수 있습니다.</p>';
+    html += '<p class="app-modal-note">청산·즉시 개인화 가정입니다. 가정세율 또는 의제배당(시뮬레이션)으로 잔여현금에 세금을 반영합니다.</p>';
+    html += '<p class="app-modal-note">실제 청산 시 취득가액·자본금·잉여금 및 개인별 금융소득에 따라 세액이 달라질 수 있습니다. 법률상 확정 청산세가 아닙니다.</p>';
     html += "</section>";
     html += "</div>";
     html += '<div class="app-modal-foot"><button type="button" class="btn" data-action="close-liq-help">확인</button></div>';
@@ -5485,7 +5580,7 @@
     );
     html += '<section class="floor-sec">';
     html += "<h3>배수로 키우면 경제가치는</h3>";
-    html += '<p class="muted small">1인 기획사와 기존 회사 전속의 실질 경제가치입니다. 상세는 위 1~5배에서 월별·시나리오·한눈을 펼쳐 보면 됩니다.</p>';
+    html += '<p class="muted small">1인 기획사와 기존 회사 전속의 배우 통제 경제가치입니다. 세후 개인 실수령(법인카드·법인잔여 제외)과 별도 지표입니다. 상세는 위 1~5배에서 월별·시나리오·한눈을 펼쳐 보면 됩니다.</p>';
     html += '<div class="floor-panel">';
     html += '<table class="floor-table"><thead><tr><th>배수</th><th class="num">총매출</th>' +
       '<th class="num">1인 기획사</th><th class="num">기존 회사 전속</th><th class="num">차이</th></tr></thead><tbody>';
@@ -5600,7 +5695,7 @@
     row("대표 급여 세후 실수령", solo.actorNetIncome, 0, { ex: false, tab: "income-tax" });
     row("총 세부담", solo.totalTaxBurden, ex.totalTaxBurden, { tab: "income-tax" });
     row("배우 개인 실수령", solo.actorNetIncome, ex.actorNetIncome, { highlight: true });
-    row("실질 경제가치", solo.controlledEconomicValue, ex.controlledEconomicValue);
+    row("배우 통제 경제가치", solo.controlledEconomicValue, ex.controlledEconomicValue);
     html += "</tbody></table>";
     return html;
   }
@@ -6062,15 +6157,15 @@
     }
     if (card) {
       html += scenarioFamilyJoin();
-      html += scenarioFamilyEqRow("대표 신용카드 사용분", card);
+      html += scenarioFamilyEqRow("대표 신용카드 사용분 (개인 귀속 혜택)", card);
     }
     html += "</div>";
-    html += '<div class="scenario-family-result"><span>1인 기획사 경제가치</span><b>' +
+    html += '<div class="scenario-family-result"><span>1인 기획사 통제 경제가치</span><b>' +
       App.Format.formatWon(solo.controlledEconomicValue) + "</b></div>";
-    html += '<div class="scenario-family-rate">매출 대비 경제가치율 ' + esc(rateText) + "</div>";
+    html += '<div class="scenario-family-rate">매출 대비 통제 경제가치율 ' + esc(rateText) + "</div>";
     if (cashGap) {
       html += '<p class="muted small">손익 외 현금 ' + App.Format.formatWon(cashGap) +
-        "원은 법인 통장에는 반영되지만 경제가치 비교에서는 제외</p>";
+        "원은 법인 통장에는 반영되지만 통제 경제가치 비교에서는 제외</p>";
     }
     html += "</div>";
     return html;
@@ -6082,9 +6177,9 @@
     html += '<div class="scenario-family-eq">';
     html += scenarioFamilyEqRow("세후 개인 실수령", ex.actorNetIncome);
     html += "</div>";
-    html += '<div class="scenario-family-result"><span>기존 회사 전속 경제가치</span><b>' +
+    html += '<div class="scenario-family-result"><span>기존 회사 전속 통제 경제가치</span><b>' +
       App.Format.formatWon(ex.controlledEconomicValue) + "</b></div>";
-    html += '<div class="scenario-family-rate">매출 대비 경제가치율 ' + esc(rateText) + "</div>";
+    html += '<div class="scenario-family-rate">매출 대비 통제 경제가치율 ' + esc(rateText) + "</div>";
     html += "</div>";
     return html;
   }
@@ -6123,7 +6218,7 @@
     lines.push({ label: "결정세액", amount: f.determined, sign: "result" });
     lines.push({ label: "지방소득세", amount: f.local, sign: "out" });
     if (f.dividendTax) {
-      lines.push({ label: f.payoutTaxLabel || "배당소득세 (15.4%)", amount: f.dividendTax, sign: "out" });
+      lines.push({ label: f.payoutTaxLabel || "배당소득 분리과세 (15.4%)", amount: f.dividendTax, sign: "out" });
     }
     lines.push({ label: "연도 총세액", amount: f.total, sign: "out" });
     lines.push({ label: "세후 개인 실수령", amount: f.afterTax, total: true, sign: "result" });
@@ -6194,7 +6289,7 @@
     );
     var bridge = corpProfitCashBridge(result, solo, periodAfterTax);
     html += scenarioGroupFoot("전체 기간 세후순이익", periodAfterTax, "open-scenario-corp-help",
-      "아래 1인 기획사 경제가치의 누적 세후순이익과 같은 금액", "gold");
+      "아래 1인 기획사 통제 경제가치의 누적 세후순이익과 같은 금액", "gold");
     if (bridge.delta) {
       html += scenarioGroupFoot("손익 외 현금", bridge.delta, "open-scenario-corp-help");
     }
@@ -6241,7 +6336,7 @@
     if (bridge.delta) {
       html += '<section class="app-modal-section"><h4>손익 외 현금</h4>';
       html += '<p class="app-modal-note">세후순이익은 장부 이익이고, 법인잔여는 통장입니다. 차이 ' +
-        App.Format.formatWon(bridge.delta) + "은 손익에 넣지 않는 현금입니다. 법인 통장 잔액에는 남지만 1인 기획사 경제가치 비교에는 넣지 않습니다.";
+        App.Format.formatWon(bridge.delta) + "은 손익에 넣지 않는 현금입니다. 법인 통장 잔액에는 남지만 1인 기획사 통제 경제가치 비교에는 넣지 않습니다.";
       if (bridge.initial) html += " 최초 보유현금 " + App.Format.formatWon(bridge.initial) + ".";
       if (bridge.vatNet) html += " 부가세 예수금−납부 " + App.Format.formatWon(bridge.vatNet) + ".";
       if (bridge.otherIn) html += " 보증금 회수·기타입금 " + App.Format.formatWon(bridge.otherIn) + ".";
@@ -6251,7 +6346,7 @@
     }
     html += '<section class="app-modal-section"><h4>전체 세후 법인잔여</h4>';
     html += '<p class="app-modal-note">법인잔여는 통장에서 아직 안 낸 법인세·주민세를 뺀 금액입니다. 기간말 현금 ' +
-      App.Format.formatWon(solo.corporateEndingCash) + "과 다를 수 있습니다. 1인 기획사 경제가치는 이 통장잔액이 아니라 전체 기간 누적 세후순이익을 사용합니다.</p></section>";
+      App.Format.formatWon(solo.corporateEndingCash) + "과 다를 수 있습니다. 1인 기획사 통제 경제가치는 이 통장잔액이 아니라 전체 기간 누적 세후순이익을 사용합니다.</p></section>";
     html += '<section class="app-modal-section"><h4>법인 계산 상세 보기</h4>';
     html += '<p class="app-modal-note">세후순이익은 세전이익에서 법인세·법인지방소득세를 뺀 손익 기준 금액입니다. ' +
       "위쪽 「전체 세후 법인잔여」는 최초 보유현금·보증금·자산 구입 등 손익 외 현금이동까지 포함한 실제 통장잔액이라 서로 다를 수 있습니다.</p></section>";
@@ -6374,7 +6469,7 @@
       scenarioMiniRow("종합소득세", ex.incomeTax, "out") +
       scenarioMiniRow("지방소득세", ex.localIncomeTax, "out") +
       scenarioMiniRow("세후 개인 실수령", ex.actorNetIncome, "result") +
-      scenarioMiniRow("기존 회사 전속 경제가치", ex.controlledEconomicValue, "result");
+      scenarioMiniRow("기존 회사 전속 통제 경제가치", ex.controlledEconomicValue, "result");
     html += scenarioDetailFoldBody(ui, "scenario-exclusive", "배분 계산 상세 보기",
       exTaxInner + '<table class="scenario-mini">' + exSum + "</table>",
       "open-scenario-ex-person-help");
@@ -6509,7 +6604,7 @@
         html += helpImportantNote("공통 지원비 " + App.Format.formatWon(support) +
           "원은 양 시나리오에서 동일하게 발생하므로 경제가치 비교에서 제외합니다.");
       }
-      html += helpImportantNote("세후 개인 실수령은 종합소득세 납부 후 개인에게 실제 남는 돈입니다. 매출이 줄면 언제부터 1인 기획사가 불리해지는지는 " +
+      html += helpImportantNote("세후 개인 실수령은 종합소득세 납부 후 개인에게 실제 남는 돈입니다(법인카드·법인잔여 미포함). 배우 통제 경제가치는 실수령에 법인 세후이익·개인 귀속 혜택 등을 더한 지표입니다. 매출이 줄면 언제부터 1인 기획사가 불리해지는지는 " +
         '<button type="button" class="btn-link" data-action="analysis-tab" data-tab="revenue-floor">참고(매출하한)</button>에서, 배우가 보는 다른 요약은 ' +
         '<button type="button" class="btn-link" data-action="analysis-tab" data-tab="income-tax">한눈에 비교</button>에서 확인합니다.');
     }
@@ -6716,14 +6811,14 @@
         App.Format.formatWonAbout(keepDelta).replace(/^약 /, "") + "의 경제적 가치가 더 큽니다.";
     }
     if (keepDelta > 0) {
-      return "1인 기획사는 현재 기준 총 경제가치가 약 " +
+      return "1인 기획사는 현재 기준 배우 통제 경제가치가 약 " +
         App.Format.formatWonAbout(keepDelta).replace(/^약 /, "") + " 더 큽니다.";
     }
     if (keepDelta < 0) {
       return "현재 기준 기존 회사 전속의 경제가치가 약 " +
         App.Format.formatWonAbout(-keepDelta).replace(/^약 /, "") + " 더 큽니다.";
     }
-    return "현재 기준 두 선택지의 총 경제가치는 같습니다.";
+    return "현재 기준 두 선택지의 배우 통제 경제가치는 같습니다.";
   }
 
   function taxYearDetailOf(detail, year) {
@@ -6765,7 +6860,7 @@
       otherIncome: App.Money.roundWon(detail.otherIncome),
       dividendTax: App.Money.roundWon(detail.dividendTax),
       payoutIncomeLabel: detail.payoutIncomeLabel || "대표 배당",
-      payoutTaxLabel: detail.payoutTaxLabel || "배당소득세 (15.4%)",
+      payoutTaxLabel: detail.payoutTaxLabel || "배당소득 분리과세 (15.4%)",
       taxableIncome: App.Money.roundWon(taxableIncome),
       taxableBase: App.Money.roundWon(detail.taxableBase),
       assessed: App.Money.roundWon(assessed),
@@ -6808,7 +6903,7 @@
     html += taxResultLine("결정세액", analysisDisplayAmount(f.determined, "result"));
     html += taxResultLine("지방소득세", analysisDisplayAmount(f.local, "out"));
     if (f.dividendTax) {
-      html += taxResultLine(f.payoutTaxLabel || "배당소득세 (15.4%)", analysisDisplayAmount(f.dividendTax, "out"));
+      html += taxResultLine(f.payoutTaxLabel || "배당소득 분리과세 (15.4%)", analysisDisplayAmount(f.dividendTax, "out"));
     }
     html += taxResultLine("연도 총세액", analysisDisplayAmount(f.total, "out"), { hl: true });
     if (f.afterTax) html += taxResultLine("세후 개인 실수령", analysisDisplayAmount(f.afterTax, "result"));
@@ -6880,12 +6975,12 @@
     if (App.Money.roundWon(solo.ownerCorporateCardValue)) {
       html += taxHeroMetric("대표 신용카드 사용분", solo.ownerCorporateCardValue, { sign: "in" });
     }
-    html += taxHeroMetric("지금 기준 총 경제가치", solo.controlledEconomicValue, { total: true });
+    html += taxHeroMetric("배우 통제 경제가치", solo.controlledEconomicValue, { total: true });
     html += "</article>";
     html += '<article class="tax-hero-card">';
     html += "<h3>기존 회사 전속</h3>";
     html += taxHeroMetric("내가 바로 받는 돈", ex.actorNetIncome);
-    html += taxHeroMetric("지금 기준 총 경제가치", ex.controlledEconomicValue, { total: true });
+    html += taxHeroMetric("배우 통제 경제가치", ex.controlledEconomicValue, { total: true });
     html += "</article></div>";
 
     html += '<div class="tax-callout tax-decision">';
@@ -6915,7 +7010,7 @@
       html += taxFlowStep("대표 신용카드 사용분", solo.ownerCorporateCardValue, { sign: "in" });
     }
     html += '<div class="tax-flow-arrow">=</div>';
-    html += taxFlowStep("내가 보유하게 되는 전체 가치", solo.controlledEconomicValue, { total: true });
+    html += taxFlowStep("내가 보유하게 되는 통제 경제가치", solo.controlledEconomicValue, { total: true });
     html += "</section>";
     html += '<section class="tax-flow-col"><h3>기존 회사 · 돈의 흐름</h3>';
     html += taxFlowStep("총 매출", revenue, { sign: "in" });
@@ -6932,7 +7027,7 @@
     html += '<div class="tax-flow-arrow">↓</div>';
     html += taxFlowStep("내 개인 통장에 남는 돈", ex.actorNetIncome);
     html += '<div class="tax-flow-arrow">=</div>';
-    html += taxFlowStep("내가 보유하게 되는 전체 가치", ex.controlledEconomicValue, { total: true });
+    html += taxFlowStep("내가 보유하게 되는 통제 경제가치", ex.controlledEconomicValue, { total: true });
     html += "</section></div>";
 
     html += '<div class="tax-liq-card">';
@@ -6943,7 +7038,7 @@
     html += '<section class="tax-verdict-block"><h3>법인 유지</h3>';
     html += taxResultStackLine("내 개인 통장에 남는 돈", solo.actorNetIncome, { key: true });
     html += taxResultStackLine("전체 기간 누적 세후순이익", soloProfitForEconomicValue(solo), { key: true });
-    html += taxResultStackLine("총 경제가치", solo.controlledEconomicValue, { hl: true });
+    html += taxResultStackLine("배우 통제 경제가치", solo.controlledEconomicValue, { hl: true });
     html += "</section>";
     html += '<section class="tax-verdict-block tax-decision"><h3>지금 청산한다고 가정</h3>';
     html += taxResultStackLine("청산 전 법인 잔여", solo.corporateEndingCash);
@@ -6951,15 +7046,17 @@
       html += taxResultStackLine("미납 부가세·법인세·지방소득세", solo.pendingTaxLiability, { sign: "out" });
       html += taxResultStackLine("미납세금 차감 후 잔여", solo.corpCashAfterPendingTax);
     }
-    html += taxResultStackLine("법인을 지금 정리할 경우 예상 세금 (" + pctView(solo.liquidationTaxRate) + "%)",
-      solo.corporateLiquidationTax, { sign: "out" });
-    html += taxResultStackLine("청산 후 법인 잔여", solo.corporateCashAfterLiquidation, { key: true });
-    html += taxResultStackLine("내 개인 통장에 남는 돈", solo.actorNetIncome);
-    html += taxResultStackLine("청산 후 경제가치", solo.controlledEconomicValueAfterLiquidation, { hl: true });
+    var liqTaxLabel = solo.liquidationMode === "deemedDividend"
+      ? ("의제배당 가정 세금" + (solo.liquidationTaxLabel ? " · " + solo.liquidationTaxLabel : ""))
+      : ("청산 가정세율 세금 (" + pctView(solo.liquidationTaxRate) + "%)");
+    html += taxResultStackLine(liqTaxLabel, solo.corporateLiquidationTax, { sign: "out" });
+    html += taxResultStackLine("청산 가정 후 법인 잔여", solo.corporateCashAfterLiquidation, { key: true });
+    html += taxResultStackLine("세후 개인 실수령", solo.actorNetIncome);
+    html += taxResultStackLine("청산 가정 후 통제 경제가치", solo.controlledEconomicValueAfterLiquidation, { hl: true });
     html += "</section></div>";
     html += '<div class="tax-liq-compare">';
-    html += taxResultStackLine("기존 회사 전속", ex.controlledEconomicValue, { key: true });
-    html += taxResultStackLine("1인 기획사 즉시 청산 가정", solo.controlledEconomicValueAfterLiquidation, { key: true });
+    html += taxResultStackLine("기존 회사 전속 통제 경제가치", ex.controlledEconomicValue, { key: true });
+    html += taxResultStackLine("1인 기획사 청산 가정", solo.controlledEconomicValueAfterLiquidation, { key: true });
     html += taxResultStackLine("차이", liqDelta, { hl: true, sign: "delta" });
     html += "</div>";
     html += '<p><b>법인을 유지하면 <span class="tax-liq-summary-amt">' + esc(signedWonAbout(keepDelta)) +
@@ -7022,11 +7119,12 @@
       taxIncomeCell(right.prefix, right.tax, rd.earnedGross || right.linked, "대표자 총급여"),
       "tax-row-income tax-row-key"
     );
-    html += inputRow("기타 종합소득", "additionalIncome");
-    html += inputRow("필요경비", "necessaryExpenses");
-    html += inputRow("추가 소득공제", "incomeDeduction");
-    html += inputRow("기타 과세조정", "otherAdjustment");
-    html += inputRow("기타 기납부세액", "prepaidTax");
+    html += inputRow("기타 종합소득 (첫 해만)", "additionalIncome");
+    html += inputRow("필요경비 (매년)", "necessaryExpenses");
+    html += inputRow("추가 소득공제 (매년)", "incomeDeduction");
+    html += inputRow("기타 과세조정 (매년)", "otherAdjustment");
+    html += inputRow("기타 기납부세액 (첫 해만)", "prepaidTax");
+    html += '<tr class="tax-row-mute"><td colspan="2"><p class="muted small" style="margin:0.4rem 0 0">매년 적용 항목은 귀속연도마다 반영하고, 첫 해만 항목은 시뮬 첫 과세연도에만 넣습니다. 배당은 연 2,000만원 초과 시 금융소득종합과세(시뮬레이션)로 합산하며 배당세액공제 등은 미반영입니다.</p></td></tr>';
     if (mode === "manual") html += inputRow("수동 세액", "manualTaxAmount");
     if (mode === "rate") html += inputRow("유효세율", "effectiveRate", "percent");
     html += "</tbody></table></div>";
@@ -7179,7 +7277,7 @@
     html += '<div class="floor-head">';
     html += "<div><h2>참고 · 매출하한 기준</h2>";
     html += '<p class="muted small">지금 입력된 인건비·운영비·시작자금·기간은 그대로 두고, 기간 매출만 같은 비율로 줄여 엔진으로 다시 계산한 참고값입니다. ' +
-      "전속 배분과 1인 기획사 경제가치 정의는 시나리오 비교와 같습니다.</p></div>";
+      "전속 배분과 1인 기획사 통제 경제가치 정의는 시나리오 비교와 같습니다.</p></div>";
     if (floor.startMonth && floor.endMonth) {
       html += '<div class="floor-period">' + esc(floor.startMonth) + " ~ " + esc(floor.endMonth) +
         "<em>" + monthCount + "개월 · 연환산은 12/" + monthCount + "</em></div>";

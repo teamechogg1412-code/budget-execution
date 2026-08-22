@@ -14,6 +14,10 @@
 
   var SOURCE_2023 = "국세청 종합소득세 기본세율 (2023년 이후). 시뮬레이션용이며 실제 신고세액과 다를 수 있습니다.";
 
+  // 이자·배당 등 금융소득이 연 2,000만원을 초과하면 금융소득 종합과세 대상 (국세청).
+  // 본 시뮬은 배당만 보며, 배당세액공제 등 정밀특례는 1차 미반영.
+  var FINANCIAL_INCOME_COMPREHENSIVE_THRESHOLD = 20000000;
+
   function tableFor(year) {
     return {
       year: year,
@@ -125,6 +129,7 @@
     INCOME_TYPES: INCOME_TYPES,
     SOURCE: SOURCE_2023,
     BUSINESS_EXPENSE_RATES: BUSINESS_EXPENSE_RATES,
+    FINANCIAL_INCOME_COMPREHENSIVE_THRESHOLD: FINANCIAL_INCOME_COMPREHENSIVE_THRESHOLD,
     availableYears: availableYears,
     resolveTable: resolveTable,
     getBusinessExpenseRate: getBusinessExpenseRate,

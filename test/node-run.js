@@ -33,13 +33,18 @@ const files = [
   "js/supabase-config.js",
   "js/telegram-config.js",
   "js/telegram.js",
+  "js/access-config.js",
   "js/access.js",
   "js/store.js",
   "js/remote-store.js",
   "js/data/sample-from-xlsx.js",
   "js/render.js",
   "js/export-excel.js",
-  "test/cases.js"
+  "landing/js/contract-engine.js",
+  "landing/js/campaign-config.js",
+  "landing/js/link-gate.js",
+  "test/cases.js",
+  "test/contract-cases.js"
 ];
 
 const context = {
@@ -55,23 +60,57 @@ const context = {
   parseInt,
   isNaN,
   Infinity,
+  URLSearchParams: typeof URLSearchParams !== "undefined" ? URLSearchParams : undefined,
+  location: { search: "", href: "http://localhost/landing/index.html", replace: function () {} },
+  document: {
+    documentElement: {
+      classList: { add: function () {}, remove: function () {}, contains: function () { return false; } }
+    },
+    querySelector: function () { return null; },
+    querySelectorAll: function () { return []; },
+    createElement: function () {
+      return {
+        setAttribute: function () {},
+        appendChild: function () {},
+        style: {},
+        onload: null,
+        onerror: null
+      };
+    },
+    head: { appendChild: function () {} }
+  },
   crypto: { randomUUID: () => "id-" + Math.random().toString(16).slice(2) },
   localStorage: {
     _d: {},
     setItem(k, v) { this._d[k] = v; },
-    getItem(k) { return this._d[k] || null; },
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this._d, k) ? this._d[k] : null; },
+    removeItem(k) { delete this._d[k]; }
+  },
+  sessionStorage: {
+    _d: {},
+    setItem(k, v) { this._d[k] = v; },
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this._d, k) ? this._d[k] : null; },
     removeItem(k) { delete this._d[k]; }
   }
 };
 context.window = context;
 context.App = {};
 context.window.App = context.App;
+context.localStorage = context.localStorage;
+context.sessionStorage = context.sessionStorage;
+context.document = context.document;
+context.location = context.location;
 vm.createContext(context);
 
 files.forEach((f) => {
   const code = fs.readFileSync(path.join(root, f), "utf8");
   vm.runInContext(code, context, { filename: f });
 });
+
+// 저장소 access-config는 비밀번호를 비워 둔다. 테스트만 주입한다.
+context.AppAccessConfig = context.AppAccessConfig || {};
+context.AppAccessConfig.password = "test-access";
+context.window.AppAccessConfig = context.AppAccessConfig;
 
 const out = context.App.Tests.run();
 console.log("PASS " + out.passed + " / FAIL " + out.failed);

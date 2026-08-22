@@ -12,23 +12,20 @@
   function accessMessage() {
     var kst = kstNow();
     var when = kst.toLocaleString("ko-KR");
-    var agent = (typeof navigator !== "undefined" && navigator.userAgent) ? navigator.userAgent : "unknown";
-    var href = "";
-    try { href = String((window.location && window.location.href) || ""); } catch (err) {}
-    var place = /^file:/i.test(href) ? "로컬 파일" : (href || "-");
-    return "[1인 기획사 설립 운영 시뮬레이션] 접속 감지\n" +
-      "시간: " + when + "\n" +
-      "주소: " + place + "\n" +
-      "기기: " + agent;
+    return "[1인 기획사 설립 운영 시뮬레이션] 접속 감지\n시간: " + when;
   }
 
-  function notifyUrl(cfg, text) {
-    return "https://api.telegram.org/bot" + cfg.botToken +
-      "/sendMessage?chat_id=" + encodeURIComponent(cfg.chatId) +
-      "&text=" + encodeURIComponent(text);
+  // 봇 토큰은 브라우저에 두지 않는다. 서버 프록시(notifyUrl)만 호출한다.
+  function resolveNotifyEndpoint(cfg, text) {
+    if (cfg.notifyUrl) {
+      var sep = cfg.notifyUrl.indexOf("?") >= 0 ? "&" : "?";
+      return cfg.notifyUrl + sep + "text=" + encodeURIComponent(text);
+    }
+    return "";
   }
 
   function sendQuiet(url) {
+    if (!url) return;
     try {
       var img = new Image();
       img.src = url;
@@ -42,8 +39,10 @@
 
   function notifyAccess() {
     var cfg = window.AppTelegramConfig || {};
-    if (!cfg.enabled || !cfg.botToken || !cfg.chatId) return;
-    sendQuiet(notifyUrl(cfg, accessMessage()));
+    if (!cfg.enabled) return;
+    var url = resolveNotifyEndpoint(cfg, accessMessage());
+    if (!url) return;
+    sendQuiet(url);
   }
 
   function notifyAccessOnce() {
