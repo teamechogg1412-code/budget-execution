@@ -358,9 +358,11 @@
       annualSalary: won(monthlySalary * 12),
       profitSettle: profitSettle,
       profitSettleRate: blendedRate(profitSettle, revenue),
-      profitSettleOn: profitSettle > 0
-        || App.Money.toRatio(payout.profitShareWorkRate) > 0
-        || App.Money.toRatio(payout.profitShareSalesRate) > 0,
+      profitSettleOn: App.Defaults.isProfitShareOn
+        ? App.Defaults.isProfitShareOn(payout)
+        : (profitSettle > 0
+          || App.Money.toRatio(payout.profitShareWorkRate) > 0
+          || App.Money.toRatio(payout.profitShareSalesRate) > 0),
       dividend: dividend,
       dividendOn: dividendOn,
       dividendRate: dividendRate,
@@ -760,14 +762,22 @@
     var settle = 0;
     var rate = 0;
     var settleMap = trial && normalizeRatioYearMap(trial.profitSettleRateByYear);
-    if (trial && trial.profitSettleOn !== false) {
+    var settleOn = trial && trial.profitSettleOn !== false
+      && (trial.profitSettleOn === true
+        || won(trial.profitSettle) > 0
+        || App.Money.toRatio(trial.profitSettleRate) > 0
+        || !!(settleMap && Object.keys(settleMap).length));
+    if (settleOn) {
       settle = Math.max(0, won(trial.profitSettle));
       if (projectRev) rate = settle / projectRev;
       else if (trial.profitSettleRate != null) rate = Math.max(0, App.Money.toRatio(trial.profitSettleRate));
+      payout.profitShareOn = true;
+      payout.profitShareWorkRate = rate;
+      payout.profitShareSalesRate = rate;
+    } else {
+      payout.profitShareOn = false;
     }
-    payout.profitShareWorkRate = rate;
-    payout.profitShareSalesRate = rate;
-    if (settleMap && trial && trial.profitSettleOn !== false) {
+    if (settleMap && settleOn) {
       var yearProj = {};
       if (App.Defaults.workSalesRevenueByYear && months.length) {
         var rawYearRev = App.Defaults.workSalesRevenueByYear(clone, months);
@@ -786,6 +796,8 @@
         if (applied[k] == null) applied[k] = settleMap[k];
       });
       payout.profitShareRateByYear = applied;
+    } else if (!settleOn) {
+      delete payout.profitShareRateByYear;
     }
     var divOn = trial && trial.dividendOn;
     if (divOn == null) divOn = won(trial && trial.dividend) > 0;

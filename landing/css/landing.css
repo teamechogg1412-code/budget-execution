@@ -321,3 +321,74 @@ textarea {
 @media (min-width: 640px) {
   .pillar-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* Phase B: pulse / manager */
+.pulse-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--highlight);
+  margin: 8px 0 0;
+}
+.pulse-progress {
+  height: 6px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 8px 0 4px;
+}
+.pulse-progress-bar {
+  height: 100%;
+  width: 0;
+  background: var(--highlight);
+  transition: width 0.2s ease;
+}
+.choice-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: #f8fafc;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.choice-btn:hover,
+.choice-btn:focus-visible {
+  border-color: var(--highlight);
+  outline: none;
+}
+.choice-btn.is-selected {
+  border-color: var(--highlight);
+  background: var(--good-bg);
+}
+.manager-blurb {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.manager-blurb a { color: var(--muted); }
+body.audience-manager .manager-blurb {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+}
+.share-steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.share-steps li { margin-bottom: 8px; }
+.share-steps strong { color: var(--ink); }

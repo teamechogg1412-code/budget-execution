@@ -246,7 +246,7 @@
   function normalizeRevenueFee(item) {
     if (!item || typeof item !== "object") return null;
     var category = (item.category === "agency" || item.category === "project") ? "agency" : "sga";
-    return {
+    var out = {
       id: item.id || uid(),
       name: item.name || "",
       basis: item.basis || "totalRevenue",
@@ -255,6 +255,9 @@
       category: category,
       include: item.include !== false
     };
+    var byYear = copyYearRatioMap(item.rateByYear);
+    if (byYear) out.rateByYear = byYear;
+    return out;
   }
 
   function newRevenueFee() {
@@ -271,15 +274,20 @@
 
   function defaultRevenueFees() {
     return [
-      { id: uid(), name: "써니스", basis: "totalRevenue", revenueScope: "totalRevenue", rate: 0.05, category: "sga", include: true },
-      { id: uid(), name: "메리디안", basis: "totalRevenue", revenueScope: "totalRevenue", rate: 0.15, category: "agency", include: true }
+      { id: uid(), name: "작품·광고 영업 수수료(예시)", basis: "totalRevenue", revenueScope: "totalRevenue", rate: 0.15, category: "agency", include: true },
+      { id: uid(), name: "재무 아웃소싱 수수료(예시)", basis: "totalRevenue", revenueScope: "totalRevenue", rate: 0.05, category: "sga", include: true }
     ];
   }
 
   function isBlankRevenueFee(item) {
     if (!item || typeof item !== "object") return true;
+    var hasYearRate = !!(item.rateByYear && typeof item.rateByYear === "object" &&
+      Object.keys(item.rateByYear).some(function (k) {
+        return /^\d{4}$/.test(String(k)) && App.Money.toSafeNumber(item.rateByYear[k]) > 0;
+      }));
     return !String(item.name || "").trim() &&
       !App.Money.toSafeNumber(item.rate) &&
+      !hasYearRate &&
       (item.category === undefined || item.category === "" || item.category === "sga") &&
       item.include !== false;
   }
@@ -705,6 +713,8 @@
           label: "기존 회사 전속",
           companyShareRate: 0.30,
           actorShareRate: 0.70,
+          // 배우 사업소득 추계 필요경비. null=공식 단순경비율, 숫자=수동. 기본 5.9%(기준경비율).
+          actorExpenseRateOverride: 0.059,
           costBurdenRules: defaultCostBurdenRules(),
           actorPersonalCosts: defaultActorPersonalCosts(),
           actorPersonalCatalogRemoved: [],
@@ -951,6 +961,11 @@
               ? App.Money.toRatio(rawOwner.dividendRate) > 0
               : App.Money.roundWon(rawOwner.dividendAmount) > 0),
           dividendMonth: App.Month.normalizeMonth(rawOwner.dividendMonth),
+          // null=미지정(비율로 추론). false=설계안함(비율 있어도 월별 수익정산 0).
+          profitShareOn: (Object.prototype.hasOwnProperty.call(rawOwner, "profitShareOn")
+            && rawOwner.profitShareOn != null)
+            ? rawOwner.profitShareOn !== false
+            : null,
           profitShareWorkRate: App.Money.toRatio(rawOwner.profitShareWorkRate),
           profitShareSalesRate: App.Money.toRatio(rawOwner.profitShareSalesRate),
           profitShareExpenseRateOverride: normalizeExpenseRateOverride(rawOwner.profitShareExpenseRateOverride)
@@ -961,6 +976,9 @@
         label: rawContract.label || defaults.scenarios.exclusiveContract.label,
         companyShareRate: App.Money.toRatio(rawContract.companyShareRate != null ? rawContract.companyShareRate : defaults.scenarios.exclusiveContract.companyShareRate),
         actorShareRate: App.Money.toRatio(rawContract.actorShareRate != null ? rawContract.actorShareRate : defaults.scenarios.exclusiveContract.actorShareRate),
+        actorExpenseRateOverride: Object.prototype.hasOwnProperty.call(rawContract, "actorExpenseRateOverride")
+          ? normalizeExpenseRateOverride(rawContract.actorExpenseRateOverride)
+          : 0.059,
         costBurdenRules: normalizeCostBurdenRules(rawContract.costBurdenRules),
         actorPersonalCosts: ensureActorPersonalCostList(
           rawContract.actorPersonalCosts,
@@ -1079,12 +1097,53 @@
     };
   }
 
+  function resolvedExclusiveActorExpenseRate(state, year) {
+    var cfg = (((state && state.settings) || {}).scenarios || {}).exclusiveContract || {};
+    var official = App.PersonalTax.getBusinessExpenseRate(year, ACTOR_BUSINESS_CODE);
+    var officialRate = official ? official.simpleRate : null;
+    var override = normalizeExpenseRateOverride(cfg.actorExpenseRateOverride);
+    var isOverride = override !== null;
+    var appliedRate = isOverride ? override : (officialRate != null ? officialRate : 0);
+    return {
+      businessCode: ACTOR_BUSINESS_CODE,
+      businessName: official ? official.businessName : "배우·탤런트 등",
+      taxYear: Number(year),
+      officialRate: officialRate,
+      overrideRate: override,
+      appliedRate: appliedRate,
+      isOverride: isOverride,
+      source: official ? official.source : null,
+      missing: !official
+    };
+  }
+
   function isDividendOn(payout) {
     payout = payout || {};
     if (payout.dividendOn === false) return false;
     if (payout.dividendOn === true) return true;
     if (payout.dividendMode === "rate") return App.Money.toRatio(payout.dividendRate) > 0;
     return App.Money.roundWon(payout.dividendAmount) > 0;
+  }
+
+  function isProfitShareOn(payout) {
+    payout = payout || {};
+    if (payout.profitShareOn === false) return false;
+    if (payout.profitShareOn === true) return true;
+    return App.Money.toRatio(payout.profitShareWorkRate) > 0
+      || App.Money.toRatio(payout.profitShareSalesRate) > 0;
+  }
+
+  function setOwnerProfitShareOn(state, on) {
+    ensureScenarioSettings(state);
+    var payout = state.settings.scenarios.soloAgency.ownerPayout;
+    payout.profitShareOn = !!on;
+    if (on) {
+      if (!App.Money.toRatio(payout.profitShareWorkRate) && !App.Money.toRatio(payout.profitShareSalesRate)) {
+        payout.profitShareWorkRate = 0.3;
+        payout.profitShareSalesRate = 0.3;
+      }
+    }
+    return state;
   }
 
   function clampMonthToPeriod(month, list) {
@@ -1275,8 +1334,9 @@
   function resolveOwnerProfitShare(state, months) {
     ensureScenarioSettings(state);
     var payout = (((state.settings || {}).scenarios || {}).soloAgency || {}).ownerPayout || {};
-    var workRate = App.Money.toRatio(payout.profitShareWorkRate);
-    var salesRate = App.Money.toRatio(payout.profitShareSalesRate);
+    var shareOn = isProfitShareOn(payout);
+    var workRate = shareOn ? App.Money.toRatio(payout.profitShareWorkRate) : 0;
+    var salesRate = shareOn ? App.Money.toRatio(payout.profitShareSalesRate) : 0;
     var list = monthIdList(months);
     var inPeriod = {};
     list.forEach(function (m) { inPeriod[m] = true; });
@@ -1301,7 +1361,9 @@
         if (kind === "sales") salesRevenue = App.Money.roundWon(salesRevenue + amt);
         else workRevenue = App.Money.roundWon(workRevenue + amt);
         var year = App.TaxYear ? App.TaxYear.yearOf(month) : Number(String(month).slice(0, 4));
-        var rate = yearRatioFromMap(payout.profitShareRateByYear, year, baseRate);
+        var rate = shareOn
+          ? yearRatioFromMap(payout.profitShareRateByYear, year, baseRate)
+          : 0;
         var share = App.Money.roundWon(amt * rate);
         if (!share) return;
         var item = {
@@ -1351,6 +1413,7 @@
       byMonth: byMonth,
       amount: total,
       payments: payments,
+      on: shareOn,
       tax: ownerProfitShareWithholding(total)
     };
   }
@@ -2930,6 +2993,8 @@
     normalizeRevenueFee: normalizeRevenueFee,
     newRevenueFee: newRevenueFee,
     defaultRevenueFees: defaultRevenueFees,
+    copyYearRatioMap: copyYearRatioMap,
+    yearRatioFromMap: yearRatioFromMap,
     defaultRevenueExpenseRates: defaultRevenueExpenseRates,
     getRevenueExpenseRates: getRevenueExpenseRates,
     ensureRevenueExpenseRates: ensureRevenueExpenseRates,
@@ -2953,12 +3018,15 @@
     setOwnerDividendMode: setOwnerDividendMode,
     setOwnerDividendOn: setOwnerDividendOn,
     isDividendOn: isDividendOn,
+    setOwnerProfitShareOn: setOwnerProfitShareOn,
+    isProfitShareOn: isProfitShareOn,
     ownerDividendForMonth: ownerDividendForMonth,
     ownerDividendWithholding: ownerDividendWithholding,
     ownerDividendTaxMeta: ownerDividendTaxMeta,
     financialIncomeComprehensiveThreshold: financialIncomeComprehensiveThreshold,
     ownerProfitShareWithholding: ownerProfitShareWithholding,
     resolvedProfitShareExpenseRate: resolvedProfitShareExpenseRate,
+    resolvedExclusiveActorExpenseRate: resolvedExclusiveActorExpenseRate,
     ACTOR_BUSINESS_CODE: ACTOR_BUSINESS_CODE,
     resolveOwnerProfitShare: resolveOwnerProfitShare,
     workSalesRevenueByYear: workSalesRevenueByYear,

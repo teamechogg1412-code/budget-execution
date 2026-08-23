@@ -4,13 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>1인 기획사 설립·운영 시뮬레이션</title>
+  <meta name="description" content="전속계약과 1인 기획사를 같은 지표로 비교합니다. 회원가입·상담 없이 이용 가능하며 입력 금액은 서버에 저장하지 않습니다." />
+  <meta property="og:title" content="전속 vs 1인 기획사 — 숫자로 비교" />
+  <meta property="og:description" content="작품·광고 수익부터 정산·세금까지. 상담 없이 전속계약과 독립 구조를 직접 비교해 보세요." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="전속 vs 1인 기획사 — 숫자로 비교" />
+  <meta name="twitter:description" content="상담 없이 전속계약과 독립 구조를 같은 지표로 비교합니다." />
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <link rel="stylesheet" href="css/landing.css" />
 </head>
 <body>
   <div class="page" hidden>
     <nav class="top-nav">
-      <span></span>
+      <a href="manager.html" data-carry-ref id="nav-manager">매니저용</a>
       <a href="#about-pop" id="nav-about">누가 만들었나요?</a>
     </nav>
 
@@ -21,8 +28,11 @@
       <div class="trust-badge">엔터테인먼트 업계 재무·정산 실무 경험을 바탕으로 설계
 실제 매니지먼트 비용 구조 · 배우 정산 · 법인 운영 경험을 반영</div>
       <a class="btn btn-primary" href="contract.html" data-carry-ref>내 전속계약부터 분석하기</a>
+      <a class="btn btn-secondary" href="pulse.html" data-carry-ref>30초 독립 가능성 테스트</a>
       <a class="btn btn-secondary" href="quick.html" data-carry-ref>빠르게 독립 구조 비교하기</a>
       <div class="hint">회원가입 없음 · 상담 없이 이용 가능 · 입력 금액은 서버에 저장하지 않음</div>
+      <p class="small-print">결과는 시뮬레이션 예상치이며 실제 세무 신고액과 다를 수 있습니다. 법률·세무 자문이 아닙니다.</p>
+      <p class="manager-blurb" id="manager-blurb">매니저·에이전트라면 <a href="manager.html" data-carry-ref>배우에게 보낼 공유 문구</a>를 확인하세요.</p>
     </div>
 
     <div id="about-pop" class="about-pop" hidden>
@@ -51,6 +61,12 @@
     document.getElementById("about-close").addEventListener("click", function () {
       document.getElementById("about-pop").hidden = true;
     });
+    try {
+      var role = new URLSearchParams(window.location.search).get("audience");
+      if (role === "manager") {
+        document.body.classList.add("audience-manager");
+      }
+    } catch (err) {}
   </script>
 </body>
 </html>

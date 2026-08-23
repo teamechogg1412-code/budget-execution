@@ -202,13 +202,24 @@
     yearSettings.withholdingTax = isFirstYear ? yearSettings.withholdingTax : 0;
 
     var rateInfo = null;
+    var manualNec = App.Money.roundWon(yearSettings.necessaryExpenses);
     if (business && App.Defaults.resolvedProfitShareExpenseRate && state) {
       rateInfo = App.Defaults.resolvedProfitShareExpenseRate(state, year);
-      yearSettings.necessaryExpenses = App.Money.roundWon(
-        business * App.Money.toRatio(rateInfo.appliedRate)
-      );
+      // 화면「필요경비 (매년)」절대액이 있으면 우선, 없으면 업종 경비율.
+      yearSettings.necessaryExpenses = manualNec > 0
+        ? manualNec
+        : App.Money.roundWon(business * App.Money.toRatio(rateInfo.appliedRate));
+      if (manualNec > 0) {
+        rateInfo = Object.assign({}, rateInfo, {
+          appliedRate: business > 0 ? (manualNec / business) : rateInfo.appliedRate,
+          isManualAmount: true,
+          isOverride: true
+        });
+      }
     } else if (opts.forceNecessaryExpenses != null) {
       yearSettings.necessaryExpenses = App.Money.roundWon(opts.forceNecessaryExpenses);
+    } else if (manualNec > 0) {
+      yearSettings.necessaryExpenses = manualNec;
     }
 
     function buildSettings(split, withholdingExtra) {
@@ -295,8 +306,25 @@
       }, withholding.total)
     );
     if (rateInfo) comprehensive.businessExpenseRateInfo = rateInfo;
-    // 표시용 otherIncome은 법인 배당만. 개인세는 base + 배당 증분(외부 구간 반영).
+    // 표시용 otherIncome은 법인 배당만. 개인세 총액은 base + 배당 증분(외부 구간 반영).
+    // 국세·지방세 상세는 base(근로·사업) 값을 유지하고, 배당 증분은 dividendTax로 따로 표시한다.
+    // → 화면에서 종소+지방+배당세 = totalPersonalTax 가 맞는다.
     comprehensive.totalPersonalTax = App.Money.roundWon(baseDetail.totalPersonalTax + dividendIncrementalTax);
+    comprehensive.determinedTax = baseDetail.determinedTax;
+    comprehensive.incomeTax = baseDetail.determinedTax;
+    comprehensive.localIncomeTax = baseDetail.localIncomeTax;
+    comprehensive.assessedTax = baseDetail.assessedTax;
+    comprehensive.taxCredit = baseDetail.taxCredit;
+    comprehensive.autoTaxCredit = baseDetail.autoTaxCredit;
+    comprehensive.userTaxCredit = baseDetail.userTaxCredit;
+    comprehensive.taxableBase = baseDetail.taxableBase;
+    // 배당 증분세 중 이미 원천징수(15.4%)로 낸 부분은 기납부로 보고, 남은 부분만
+    // "추가 납부"에 얹는다 — 그래야 화면의 추가납부액이 실제로 더 내야 하는 금액과 맞는다.
+    var dividendShortfall = Math.max(0, App.Money.roundWon(dividendIncrementalTax - withholding.total));
+    comprehensive.additionalIncomeTax = App.Money.roundWon(baseDetail.additionalIncomeTax + dividendShortfall);
+    comprehensive.additionalTax = App.Money.roundWon(
+      comprehensive.totalPersonalTax - App.Money.roundWon(baseDetail.prepaidTotal) - withholding.total
+    );
     comprehensive.dividendTax = dividendIncrementalTax;
     comprehensive.dividendTaxMode = "comprehensive";
     comprehensive.dividendWithholding = withholding.total;
@@ -325,6 +353,7 @@
     var summedPersonalTax = 0;
     var summedPrepaid = 0;
     var summedWithholding = 0;
+    var summedAdditionalIncomeTax = 0;
     var hasComprehensive = false;
     var hasSeparate = false;
     (details || []).forEach(function (detail) {
@@ -337,6 +366,12 @@
             ? detail.totalPersonalTax
             : (detail.determinedTax + detail.localIncomeTax)
         )
+      );
+      // 연도별 additionalIncomeTax는 각자 배당 기납부(원천징수)를 이미 반영해 계산된 값이라
+      // 그대로 합산한다. 합산된 determinedTax(배당 제외)에서 합산 prepaidTotal(배당 포함)을
+      // 다시 빼면 배당 기납부가 근로·사업 몫인 것처럼 상쇄되어 실제보다 적게 표시된다.
+      summedAdditionalIncomeTax = App.Money.roundWon(
+        summedAdditionalIncomeTax + App.Money.roundWon(detail.additionalIncomeTax)
       );
       summedPrepaid = App.Money.roundWon(summedPrepaid + App.Money.roundWon(detail.prepaidTax));
       // 종합: 배당 원천이 withholdingTax에 포함. 분리: dividendWithholding을 별도 합산.
@@ -368,7 +403,7 @@
     }
     out.prepaidTotal = App.Money.roundWon(out.prepaidTax + out.withholdingTax);
     out.totalPersonalTax = summedPersonalTax;
-    out.additionalIncomeTax = App.Money.roundWon(out.determinedTax - out.prepaidTotal);
+    out.additionalIncomeTax = summedAdditionalIncomeTax;
     out.additionalPayment = App.Money.roundWon(out.totalPersonalTax - out.prepaidTotal);
     out.refund = out.additionalPayment < 0 ? -out.additionalPayment : 0;
     out.afterTaxIncome = App.Money.roundWon(
@@ -549,7 +584,10 @@
       profitShareTaxParts = { national: 0, local: 0, total: 0, label: "사업소득세 (3.3%)" };
     }
     var personalTax = taxDetail.totalPersonalTax;
-    var actorNet = App.Money.roundWon(actorGross - personalTax);
+    var soloActorBorneSupportCost = App.Money.roundWon(
+      soloResult && soloResult.support && soloResult.support.soloActorCostTotal
+    );
+    var actorNet = App.Money.roundWon(actorGross - soloActorBorneSupportCost - personalTax);
     var corpCash = App.Money.roundWon(k.endClosing);
     var ownerCorporateCardValue = ownerCorporateCardValueFromLedger(soloResult);
     var actorSupportValue = App.Engine.actorSupportBenefitTotal
@@ -682,6 +720,7 @@
       actorNetIncome: actorNet,
       ownerCorporateCardValue: ownerCorporateCardValue,
       actorSupportValue: actorSupportValue,
+      actorBorneSupportCost: soloActorBorneSupportCost,
       commonActorSupportValue: commonActorSupportValue,
       uniqueBenefitValue: uniqueBenefitValue,
       ownerIncentiveAmount: ownerIncentive,
@@ -883,9 +922,9 @@
       if (splitBase < 0) splitBase = 0;
       var actorGross = App.Money.roundWon(splitBase * actorRate);
       var directorCost = exclusiveDirectorCost(state, soloResult, monthRows);
-      var actorBorneCosts = directorCost;
+      var actorBorneCosts = App.Money.roundWon(directorCost + split.actorBorneCosts);
       var actorSupport = exclusiveActorSupportInMonths(soloResult, monthIds);
-      var taxableIncome = App.Money.roundWon(actorGross - directorCost - actorSupport);
+      var taxableIncome = App.Money.roundWon(actorGross - actorBorneCosts - actorSupport);
       if (taxableIncome < 0) taxableIncome = 0;
       return {
         year: year,
@@ -905,7 +944,7 @@
     });
   }
 
-  function calculateExclusivePersonalTaxDetail(slices, settings) {
+  function calculateExclusivePersonalTaxDetail(slices, settings, state) {
     settings = settings && typeof settings === "object" ? settings : {};
     var actorGross = App.Money.sumBy(slices, function (s) { return s.actorGross; });
     if (settings.mode !== "auto") {
@@ -914,14 +953,28 @@
     if (!slices.length) return App.Engine.calculateScenarioPersonalTaxDetail(0, settings);
     var details = slices.map(function (slice, idx) {
       var yearSettings = resolveYearTaxSettings(settings, idx === 0);
+      var rateInfo = App.Defaults.resolvedExclusiveActorExpenseRate
+        ? App.Defaults.resolvedExclusiveActorExpenseRate(state, slice.year)
+        : { appliedRate: 0 };
+      var rateNec = App.Money.roundWon(slice.taxableIncome * App.Money.toRatio(rateInfo.appliedRate));
+      var manualNec = App.Money.roundWon(yearSettings.necessaryExpenses);
+      // 화면「필요경비 (매년)」절대액이 있으면 우선, 없으면 업종 경비율.
+      var nec = manualNec > 0 ? manualNec : rateNec;
+      if (manualNec > 0) {
+        rateInfo = Object.assign({}, rateInfo, {
+          appliedRate: slice.taxableIncome > 0 ? (manualNec / slice.taxableIncome) : rateInfo.appliedRate,
+          isManualAmount: true,
+          isOverride: true
+        });
+      }
+      yearSettings.necessaryExpenses = nec;
       yearSettings = App.Engine.copyTaxSettings(yearSettings, {
         earnedGross: 0,
         businessIncome: slice.taxableIncome,
         otherIncome: 0
       });
       yearSettings.year = slice.year;
-      // oneTime prepaid/withholding already applied only on first year via resolveYearTaxSettings.
-      // Keep non-first years at zero prepaid so aggregate can still surface settings totals.
+      yearSettings.necessaryExpenses = nec;
       if (idx !== 0) {
         yearSettings.prepaidTax = 0;
         yearSettings.withholdingTax = 0;
@@ -933,6 +986,7 @@
       detail.yearActorBorneCosts = slice.actorBorneCosts;
       detail.yearActorSupport = slice.actorSupport;
       detail.yearTaxableIncome = slice.taxableIncome;
+      detail.businessExpenseRateInfo = rateInfo;
       return detail;
     });
     return aggregateTaxDetails(details, settings);
@@ -976,7 +1030,7 @@
       App.Defaults.personalTaxForScenario(state, "exclusiveContract"),
       { earnedGross: 0, businessIncome: actorGross, otherIncome: 0 }
     );
-    var taxDetail = calculateExclusivePersonalTaxDetail(slices, taxSettings);
+    var taxDetail = calculateExclusivePersonalTaxDetail(slices, taxSettings, state);
     var personalTax = taxDetail.totalPersonalTax;
     var support = (soloResult && soloResult.support) || { exclusiveCompanyValueTotal: 0, exclusiveActorCostTotal: 0, byPolicy: [] };
     var companySupportValue = App.Money.roundWon(support.exclusiveCompanyValueTotal);
@@ -991,10 +1045,10 @@
     var actorBorneSupportCost = App.Money.roundWon(support.exclusiveActorCostTotal);
     var actorBornePayroll = App.Money.roundWon(buckets.actorBornePayroll);
     var directorCost = App.Money.sumBy(slices, function (s) { return s.directorCost; });
-    var actorBorneCostsTotal = directorCost;
+    var actorBorneCostsTotal = App.Money.sumBy(slices, function (s) { return s.actorBorneCosts; });
     var companyBorneCostsTotal = App.Money.roundWon(split.companyBorneCosts + App.Money.roundWon(buckets.payroll));
     var actorNet = App.Money.roundWon(
-      actorGross - directorCost - actorBorneSupportCost - personalTax
+      actorGross - actorBorneCostsTotal - actorBorneSupportCost - personalTax
     );
     var personalTaxByYear = {};
     (taxDetail.years || []).forEach(function (d) {

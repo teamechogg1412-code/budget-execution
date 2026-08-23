@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>매니저·에이전트용 — 배우에게 공유할 링크</title>
+  <meta name="description" content="배우에게 상담 없이 전속·독립 숫자를 비교하게 할 수 있는 공유용 안내입니다. 입력 금액은 서버에 저장되지 않습니다." />
+  <meta property="og:title" content="배우에게 공유할 계약·독립 비교 링크" />
+  <meta property="og:description" content="상담 유도 없이, 배우가 전속과 1인 기획사를 같은 지표로 비교할 수 있습니다." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="css/landing.css" />
+</head>
+<body>
+  <div class="page" hidden>
+    <nav class="top-nav">
+      <a href="index.html" data-carry-ref>← 배우용 첫 화면</a>
+      <a href="about.html" data-carry-ref>누가 만들었나요?</a>
+    </nav>
+
+    <h1 style="font-size:22px;margin:16px 0 8px;">매니저·에이전트용 공유 안내</h1>
+    <p class="section-body">영입 영업장이 아니라, 배우가 계약·독립을 숫자로 볼 수 있게 돕는 도구입니다. 링크만 전달하면 되고, 입력 금액은 서버에 저장되지 않습니다.</p>
+
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">추천 공유 순서</div>
+      <ol class="share-steps">
+        <li><strong>30초 테스트</strong> — 부담 없이 방향만</li>
+        <li><strong>전속계약 분석</strong> — 같은 지표로 전속 vs 독립</li>
+      </ol>
+      <p class="small-print">개인별 유효기간이 필요하면 ref를 배우마다 따로 발급하세요. 같은 ref를 여러 명에게 쓰면 최초 열림부터 24시간이 공유됩니다.</p>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">공유 문구 예시</div>
+      <textarea id="share-copy" readonly rows="6">전속 조건이랑 1인 기획사를 같은 숫자로 비교해 볼 수 있는 계산기야.
+상담 없이 혼자 해볼 수 있고, 금액은 서버에 안 남아.
+결과는 시뮬레이션 예상치라 실제 세무 신고액과 다를 수 있어.
+필요할 때만 검토 요청하면 돼.</textarea>
+      <button type="button" class="btn btn-secondary" id="btn-copy-share" style="margin-top:10px;">문구 복사</button>
+      <p class="small-print" id="copy-status" hidden>복사했습니다.</p>
+    </div>
+
+    <a class="btn btn-primary" href="pulse.html" data-carry-ref>30초 테스트 링크 열기</a>
+    <a class="btn btn-secondary" href="contract.html" data-carry-ref>전속계약 분석 링크 열기</a>
+    <a class="btn btn-secondary" href="index.html" data-carry-ref>배우용 첫 화면</a>
+
+    <div class="brand-footer"><a href="about.html" data-carry-ref>누가 만들었나요?</a></div>
+  </div>
+
+  <script src="js/campaign-config.js"></script>
+  <script src="js/link-gate.js"></script>
+  <script src="js/visit-ping-config.js"></script>
+  <script src="js/visit-ping.js"></script>
+  <script>
+    App.LinkGate.check({ expiredUrl: "expired.html" }).then(function (state) {
+      if (state !== "expired") App.VisitPing.notify("manager");
+    });
+    document.getElementById("btn-copy-share").addEventListener("click", function () {
+      var text = document.getElementById("share-copy").value;
+      function ok() {
+        var el = document.getElementById("copy-status");
+        el.hidden = false;
+        setTimeout(function () { el.hidden = true; }, 2000);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok).catch(function () {
+          document.getElementById("share-copy").select();
+          try { document.execCommand("copy"); ok(); } catch (e) {}
+        });
+      } else {
+        document.getElementById("share-copy").select();
+        try { document.execCommand("copy"); ok(); } catch (e2) {}
+      }
+    });
+  </script>
+</body>
+</html>

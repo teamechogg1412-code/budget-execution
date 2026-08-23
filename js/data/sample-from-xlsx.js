@@ -766,6 +766,7 @@
       "startMonth": null,
       "endMonth": null,
       "insure": true,
+      "insureLimited": true,
       "meal": true,
       "severance": false,
       "include": true,
@@ -1307,10 +1308,11 @@
           "withholdingTax": 0
         }
       },
-      "exclusiveContract": {
+        "exclusiveContract": {
         "label": "기존 회사 전속",
         "companyShareRate": 0.4,
         "actorShareRate": 0.6,
+        "actorExpenseRateOverride": 0.059,
         "costBurdenRules": {
           "projectDirect": "company",
           "projectExpense": "company",
@@ -1465,7 +1467,7 @@
   "revenueFees": [
     {
       "id": "ad85cec0-8ff3-4936-8088-06e10c307aaf",
-      "name": "써니스",
+      "name": "재무 아웃소싱 수수료(예시)",
       "basis": "totalRevenue",
       "revenueScope": "totalRevenue",
       "rate": 0.02,
@@ -1474,7 +1476,7 @@
     },
     {
       "id": "adc01edd-6ea3-4106-8566-b719a1e9cd5b",
-      "name": "메리디안",
+      "name": "작품·광고 영업 수수료(예시)",
       "basis": "totalRevenue",
       "revenueScope": "totalRevenue",
       "rate": 0.08,

@@ -9,17 +9,21 @@
     var cfg = config();
     if (!cfg.enabled || !cfg.notifyUrl) return;
     var ref = (App.LinkGate && App.LinkGate.getRef()) || "(없음)";
-    var when = new Date().toLocaleString("ko-KR");
-    var text = "[배우 계약·독립 시뮬레이터] 방문\n페이지: " + pageName + "\nref: " + ref + "\n시간: " + when;
-    var sep = cfg.notifyUrl.indexOf("?") >= 0 ? "&" : "?";
-    var url = cfg.notifyUrl + sep + "text=" + encodeURIComponent(text);
-    try {
-      var img = new Image();
-      img.src = url;
-    } catch (err) {}
     if (typeof fetch === "function") {
       try {
-        fetch(url, { mode: "no-cors", cache: "no-store" }).catch(function () {});
+        var campaign = window.LandingCampaignConfig || {};
+        fetch(cfg.notifyUrl, {
+          method: "POST",
+          mode: "cors",
+          cache: "no-store",
+          keepalive: true,
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + String(campaign.anonKey || ""),
+            "apikey": String(campaign.anonKey || "")
+          },
+          body: JSON.stringify({ page: String(pageName || "unknown"), ref: ref })
+        }).catch(function () {});
       } catch (err2) {}
     }
   }

@@ -47,10 +47,12 @@
     var simStart = months && months[0];
     var simEnd = months && months.length ? months[months.length - 1] : simStart;
     var soloByMonth = {};
+    var soloActorByMonth = {};
     var exclusiveByMonth = {};
     var exclusiveActorByMonth = {};
     (months || []).forEach(function (m) {
       soloByMonth[m] = { total: 0, items: [] };
+      soloActorByMonth[m] = { total: 0, items: [] };
       exclusiveByMonth[m] = { total: 0, items: [] };
       exclusiveActorByMonth[m] = { total: 0, items: [] };
     });
@@ -64,9 +66,11 @@
       var monthly = supportPolicyMonthlyAmount(item, state);
       if (!monthly) return;
       var soloAmt = App.Money.roundWon(monthly * soloShare);
+      var soloActorAmt = App.Money.roundWon(monthly - soloAmt);
       var exCompanyAmt = App.Money.roundWon(monthly * exShare);
       var exActorAmt = App.Money.roundWon(monthly - exCompanyAmt);
       var soloTotal = 0;
+      var soloActorTotal = 0;
       var exCompanyTotal = 0;
       var exActorTotal = 0;
       (months || []).forEach(function (m) {
@@ -75,6 +79,11 @@
           soloByMonth[m].total = App.Money.roundWon(soloByMonth[m].total + soloAmt);
           soloByMonth[m].items.push({ id: item.id, name: item.name || "회사 지원", amount: soloAmt, group: item.group });
           soloTotal += soloAmt;
+        }
+        if (soloActorAmt) {
+          soloActorByMonth[m].total = App.Money.roundWon(soloActorByMonth[m].total + soloActorAmt);
+          soloActorByMonth[m].items.push({ id: item.id, name: item.name || "회사 지원", amount: soloActorAmt, group: item.group });
+          soloActorTotal += soloActorAmt;
         }
         if (exCompanyAmt) {
           exclusiveByMonth[m].total = App.Money.roundWon(exclusiveByMonth[m].total + exCompanyAmt);
@@ -87,12 +96,13 @@
         exCompanyTotal += exCompanyAmt;
         exActorTotal += exActorAmt;
       });
-      if (soloTotal || exCompanyTotal || exActorTotal) {
+      if (soloTotal || soloActorTotal || exCompanyTotal || exActorTotal) {
         byPolicy.push({
           id: item.id,
           name: item.name || "회사 지원",
           group: item.group,
           soloCost: App.Money.roundWon(soloTotal),
+          soloActorCost: App.Money.roundWon(soloActorTotal),
           exclusiveCompanyValue: App.Money.roundWon(exCompanyTotal),
           exclusiveActorCost: App.Money.roundWon(exActorTotal)
         });
@@ -100,10 +110,12 @@
     });
     return {
       soloByMonth: soloByMonth,
+      soloActorByMonth: soloActorByMonth,
       exclusiveByMonth: exclusiveByMonth,
       exclusiveActorByMonth: exclusiveActorByMonth,
       byPolicy: byPolicy,
       soloTotal: App.Money.sumBy(byPolicy, function (p) { return p.soloCost; }),
+      soloActorCostTotal: App.Money.sumBy(byPolicy, function (p) { return p.soloActorCost; }),
       exclusiveCompanyValueTotal: App.Money.sumBy(byPolicy, function (p) { return p.exclusiveCompanyValue; }),
       exclusiveActorCostTotal: App.Money.sumBy(byPolicy, function (p) { return p.exclusiveActorCost; })
     };
@@ -192,19 +204,23 @@
 
   function emptySupportMonths(months) {
     var soloByMonth = {};
+    var soloActorByMonth = {};
     var exclusiveByMonth = {};
     var exclusiveActorByMonth = {};
     (months || []).forEach(function (m) {
       soloByMonth[m] = { total: 0, items: [] };
+      soloActorByMonth[m] = { total: 0, items: [] };
       exclusiveByMonth[m] = { total: 0, items: [] };
       exclusiveActorByMonth[m] = { total: 0, items: [] };
     });
     return {
       soloByMonth: soloByMonth,
+      soloActorByMonth: soloActorByMonth,
       exclusiveByMonth: exclusiveByMonth,
       exclusiveActorByMonth: exclusiveActorByMonth,
       byPolicy: [],
       soloTotal: 0,
+      soloActorCostTotal: 0,
       exclusiveCompanyValueTotal: 0,
       exclusiveActorCostTotal: 0
     };
@@ -276,6 +292,7 @@
             name: name,
             group: "vehicle",
             soloCost: App.Money.roundWon(total),
+            soloActorCost: 0,
             exclusiveCompanyValue: App.Money.roundWon(total),
             exclusiveActorCost: 0
           });
@@ -286,6 +303,7 @@
       addLine("veh-ins-" + v.id, label + " 보험료", v.monthlyInsurance);
     });
     out.soloTotal = App.Money.sumBy(out.byPolicy, function (p) { return p.soloCost; });
+    out.soloActorCostTotal = 0;
     out.exclusiveCompanyValueTotal = App.Money.sumBy(out.byPolicy, function (p) { return p.exclusiveCompanyValue; });
     out.exclusiveActorCostTotal = 0;
     return out;
@@ -339,6 +357,7 @@
     a = a || emptySupportMonths(months);
     b = b || emptySupportMonths(months);
     var soloByMonth = {};
+    var soloActorByMonth = {};
     var exclusiveByMonth = {};
     var exclusiveActorByMonth = {};
     (months || []).forEach(function (m) {
@@ -347,6 +366,12 @@
       soloByMonth[m] = {
         total: App.Money.roundWon((aS.total || 0) + (bS.total || 0)),
         items: (aS.items || []).concat(bS.items || [])
+      };
+      var aSA = (a.soloActorByMonth && a.soloActorByMonth[m]) || { total: 0, items: [] };
+      var bSA = (b.soloActorByMonth && b.soloActorByMonth[m]) || { total: 0, items: [] };
+      soloActorByMonth[m] = {
+        total: App.Money.roundWon((aSA.total || 0) + (bSA.total || 0)),
+        items: (aSA.items || []).concat(bSA.items || [])
       };
       var aE = (a.exclusiveByMonth && a.exclusiveByMonth[m]) || { total: 0, items: [] };
       var bE = (b.exclusiveByMonth && b.exclusiveByMonth[m]) || { total: 0, items: [] };
@@ -364,10 +389,12 @@
     var byPolicy = (a.byPolicy || []).concat(b.byPolicy || []);
     return {
       soloByMonth: soloByMonth,
+      soloActorByMonth: soloActorByMonth,
       exclusiveByMonth: exclusiveByMonth,
       exclusiveActorByMonth: exclusiveActorByMonth,
       byPolicy: byPolicy,
       soloTotal: App.Money.sumBy(byPolicy, function (p) { return p.soloCost; }),
+      soloActorCostTotal: App.Money.sumBy(byPolicy, function (p) { return p.soloActorCost; }),
       exclusiveCompanyValueTotal: App.Money.sumBy(byPolicy, function (p) { return p.exclusiveCompanyValue; }),
       exclusiveActorCostTotal: App.Money.sumBy(byPolicy, function (p) { return p.exclusiveActorCost; })
     };

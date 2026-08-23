@@ -57,7 +57,8 @@
         total += amount;
         items.push({
           id: emp.id, name: emp.name || emp.role || "직원", amount: amount,
-          salaryAmount: salaryAmount, incentiveAmount: incentiveAmount, insure: !!emp.insure
+          salaryAmount: salaryAmount, incentiveAmount: incentiveAmount, insure: !!emp.insure,
+          insureLimited: !!emp.insureLimited
         });
       });
       byMonth[m] = { total: total, items: items };
@@ -100,8 +101,10 @@
           : App.Money.toSafeNumber(r.pensionEmployer);
         pension += App.Money.roundWon(bases.pension * pensionRate);
         health += App.Money.roundWon(bases.health * App.Money.toSafeNumber(r.health));
-        employment += App.Money.roundWon(bases.pay * App.Money.toSafeNumber(r.employment));
-        industrial += App.Money.roundWon(bases.pay * App.Money.toSafeNumber(r.industrialAccident));
+        if (!item.insureLimited) {
+          employment += App.Money.roundWon(bases.pay * App.Money.toSafeNumber(r.employment));
+          industrial += App.Money.roundWon(bases.pay * App.Money.toSafeNumber(r.industrialAccident));
+        }
       });
       byMonth[m] = {
         base: App.Money.roundWon(base),

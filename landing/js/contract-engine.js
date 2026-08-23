@@ -147,7 +147,8 @@
     });
     // 배우 부담 = 독립 후에도 필요한 비용.
     // 전속: 배우 개인 부담(exclusive actor cost). 1인 기획사: 법인 운영비(solo company).
-    // soloPayer:"actor"는 엔진에서 solo 비용 0이 되므로 쓰지 않는다.
+    // 독립 후에도 법인 운영에 필요한 비용이므로 이 프리셋에서는 법인 부담으로 둔다.
+    // 일반 시뮬레이터의 soloPayer:"actor"/"share" 배우 부담분은 개인 실수령에 별도 반영된다.
     addAnnualSupport(state, {
       id: "sp-contract-actor-personal",
       name: "배우 부담 비용(계약분석)",
@@ -276,7 +277,7 @@
       relativeDiff: Math.round(r * 10000) / 10000,
       headline: headline,
       drivers: (presented.sensitivity || []).slice(0, 3),
-      disclaimer: "시뮬레이션 해석이며 법률·세무 자문이 아닙니다."
+      disclaimer: "결과는 시뮬레이션 예상치이며 실제 세무 신고액과 다를 수 있습니다. 법률·세무 자문이 아닙니다."
     };
   }
 

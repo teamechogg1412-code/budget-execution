@@ -1,4 +1,8 @@
-{
+(function () {
+  window.App = window.App || {};
+
+  // 사용자가 공개용으로 승인한 익명 예산안 초기값.
+  var RAW = {
   "version": 1,
   "profile": {
     "actorName": "배우",
@@ -843,13 +847,17 @@
       "category": "sga",
       "type": "recurring",
       "amount": 5000000,
-      "startMonth": null,
-      "endMonth": null,
+      "startMonth": "2026-10",
+      "endMonth": "2027-12",
       "include": true,
-      "overrides": {},
+      "overrides": {
+        "2026-10": 3000000,
+        "2026-11": 3000000,
+        "2026-12": 3000000
+      },
       "note": "",
       "family": "sga",
-      "periodMode": "full"
+      "periodMode": "custom"
     },
     {
       "id": "d1c246e2-a854-4625-8368-4905d45bd02a",
@@ -967,6 +975,29 @@
   "forcedWorkdays": [],
   "settings": {
     "initialCashTiming": "beforeOutflows",
+    "payoutFitDraft": {
+      "monthlySalary": 5000000,
+      "monthlySalaryByYear": {
+        "2026": 5000000,
+        "2027": 5000000
+      },
+      "salaryInc": 75000000,
+      "profitSettle": 287475000,
+      "profitSettleRate": 0.1362440758293839,
+      "profitSettleRateByYear": {
+        "2026": 0,
+        "2027": 0.15
+      },
+      "profitSettleOn": true,
+      "dividend": 0,
+      "dividendOn": false,
+      "dividendRate": 0.1,
+      "dividendRateByYear": {
+        "2026": 0.1,
+        "2027": 0.1
+      },
+      "dividendMode": "rate"
+    },
     "meal": {
       "dailyRate": 12000,
       "calendarMode": "weekdaysExcludingHolidays",
@@ -998,6 +1029,8 @@
       "localTaxRate": 0.1,
       "liquidationMode": "assumedRate",
       "liquidationTaxRate": 0.154,
+      "liquidationCapitalBasis": 0,
+      "otherFinancialIncome": 0,
       "lossCarryforward": {
         "apply": true,
         "openingBalance": 0,
@@ -1301,14 +1334,24 @@
           "incomeDeduction": 0,
           "taxCredit": 0,
           "prepaidTax": 0,
-          "withholdingTax": 0
+          "withholdingTax": 0,
+          "annual": {
+            "necessaryExpenses": 0,
+            "otherAdjustment": 0,
+            "incomeDeduction": 0
+          },
+          "oneTime": {
+            "additionalIncome": 0,
+            "taxCredit": 0,
+            "prepaidTax": 0,
+            "withholdingTax": 0
+          }
         }
       },
-        "exclusiveContract": {
+      "exclusiveContract": {
         "label": "기존 회사 전속",
         "companyShareRate": 0.4,
         "actorShareRate": 0.6,
-        "actorExpenseRateOverride": 0.059,
         "costBurdenRules": {
           "projectDirect": "company",
           "projectExpense": "company",
@@ -1361,7 +1404,18 @@
           "incomeDeduction": 0,
           "taxCredit": 0,
           "prepaidTax": 0,
-          "withholdingTax": 0
+          "withholdingTax": 0,
+          "annual": {
+            "necessaryExpenses": 0,
+            "otherAdjustment": 0,
+            "incomeDeduction": 0
+          },
+          "oneTime": {
+            "additionalIncome": 0,
+            "taxCredit": 0,
+            "prepaidTax": 0,
+            "withholdingTax": 0
+          }
         }
       }
     },
@@ -1391,7 +1445,7 @@
     "title": "배우",
     "storageMode": "local",
     "createdAt": "2026-08-20T10:17:17.052Z",
-    "updatedAt": "2026-08-22T15:52:01.198Z"
+    "updatedAt": "2026-08-23T02:27:11.498Z"
   },
   "salesPlans": [
     {
@@ -1463,21 +1517,28 @@
   "revenueFees": [
     {
       "id": "ad85cec0-8ff3-4936-8088-06e10c307aaf",
-      "name": "재무 아웃소싱 수수료(예시)",
+      "name": "재무아웃소싱",
       "basis": "totalRevenue",
       "revenueScope": "totalRevenue",
       "rate": 0.02,
       "category": "sga",
-      "include": true
+      "include": true,
+      "rateByYear": {
+        "2026": 0.02
+      }
     },
     {
       "id": "adc01edd-6ea3-4106-8566-b719a1e9cd5b",
-      "name": "작품·광고 영업 수수료(예시)",
+      "name": "작품 및 광고 영업수수료",
       "basis": "totalRevenue",
       "revenueScope": "totalRevenue",
-      "rate": 0.08,
+      "rate": 0.06,
       "category": "agency",
-      "include": true
+      "include": true,
+      "rateByYear": {
+        "2026": 0.06,
+        "2027": 0.06
+      }
     }
   ],
   "vehicles": [
@@ -1506,4 +1567,12 @@
       "sourceDepositId": "9c8a6bcc-53eb-471f-a355-189c6afdb331"
     }
   ]
-}
+};
+
+  function currentPublicSeedState() {
+    return App.Defaults.ensureState(JSON.parse(JSON.stringify(RAW)));
+  }
+
+  App.PublicSample = { load: currentPublicSeedState };
+  App.Defaults.seedState = currentPublicSeedState;
+})();

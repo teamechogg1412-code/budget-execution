@@ -101,7 +101,7 @@
     employees: [
       {
         id: "seed-emp-1", name: "대표이사(본인)", role: "대표이사", monthlySalary: 5000000,
-        startMonth: null, endMonth: null, insure: true, meal: true, severance: false, include: true,
+        startMonth: null, endMonth: null, insure: true, insureLimited: true, meal: true, severance: false, include: true,
         periodMode: "full", comparisonBurdenType: "onePersonOnly", family: "sga",
         incentiveSeollal: 0, incentiveChuseok: 0, incentiveYearEnd: 0, incentiveAmount: 0
       },
@@ -120,21 +120,21 @@
     ],
     revenueFees: [
       {
-        id: "seed-fee-ops",
-        name: "법인 운영·관리비(예시)",
-        basis: "totalRevenue",
-        revenueScope: "totalRevenue",
-        rate: 0.05,
-        category: "sga",
-        include: true
-      },
-      {
-        id: "seed-fee-mgmt",
-        name: "매니지먼트·프로젝트 진행비(예시)",
+        id: "seed-fee-sales",
+        name: "작품·광고 영업 수수료(예시)",
         basis: "totalRevenue",
         revenueScope: "totalRevenue",
         rate: 0.15,
         category: "agency",
+        include: true
+      },
+      {
+        id: "seed-fee-finance",
+        name: "재무 아웃소싱 수수료(예시)",
+        basis: "totalRevenue",
+        revenueScope: "totalRevenue",
+        rate: 0.05,
+        category: "sga",
         include: true
       }
     ],

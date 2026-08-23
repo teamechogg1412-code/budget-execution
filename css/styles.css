@@ -789,6 +789,65 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .fee-table td.fee-rate-cell {
   width: 1%;
   white-space: nowrap;
+  vertical-align: top;
+}
+.fee-rate-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 7.5em;
+}
+.fee-rate-base {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fee-rate-base-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.fee-year-rates {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 6px 0 2px;
+  border-top: 1px dashed var(--line);
+  width: 100%;
+}
+.fee-year-rate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.fee-year-rate > span {
+  flex: none;
+  min-width: 3.25em;
+  text-align: right;
+}
+.fee-year-rate .with-unit,
+.fee-year-rate .fee-year-pct {
+  display: inline-flex;
+  width: auto;
+  max-width: none;
+  flex: none;
+  gap: 4px;
+}
+.fee-year-rate .with-unit input,
+.fee-year-rate .fee-year-pct input {
+  width: 3.75em;
+  min-width: 3.75em;
+  min-height: 30px;
+  flex: none;
+  text-align: right;
 }
 .fee-table th:nth-child(6),
 .fee-table td.fee-amt-cell {
@@ -1410,8 +1469,49 @@ button.cat-badge {
 .example-warning {
   color: var(--warn);
   font-weight: 700;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  border-radius: 8px;
+}
+.example-warning .example-warning-label {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--warn);
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+}
+.estimate-disclaimer {
+  margin: 12px 0 4px;
+  padding: 8px 10px;
   font-size: 12px;
-  margin: 4px 0 10px;
+  line-height: 1.45;
+  color: var(--muted);
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.estimate-disclaimer-inline {
+  margin: 6px 0 12px;
+}
+.estimate-disclaimer-bar {
+  margin: 0;
+  padding: 6px 16px;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--wash);
+  font-size: 12px;
+  color: var(--muted);
 }
 .rev-toolbar {
   display: flex;
@@ -2596,6 +2696,41 @@ details.settings-fold:not([open]) > *:not(summary) { display: none; }
 .payout-fit-pool-usage [data-computed="payout-fit-pool-usage"] {
   padding-top: 2px;
 }
+.payout-fit-operating-monitor {
+  padding: 10px 0 8px;
+}
+.payout-fit-cash-monitor {
+  border-top: 1px solid var(--line);
+  background: var(--wash);
+}
+.payout-fit-cash-state {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+.payout-fit-cash-monitor.is-short .payout-fit-cash-state,
+.payout-fit-cash-monitor .is-neg {
+  color: var(--danger);
+}
+.payout-fit-cash-monitor .is-loss {
+  color: var(--warn);
+}
+.support-share-complement {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--wash);
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .payout-fit-toggle-span {
   grid-column: 2 / -1;
   display: flex;
@@ -2786,6 +2921,19 @@ details.settings-fold:not([open]) > *:not(summary) { display: none; }
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.payout-fit-year-amt.is-neg { color: var(--warn); }
+.payout-fit-warning {
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.payout-fit-warning:empty { display: none; margin: 0; padding: 0; border: 0; }
 .payout-fit-toggle {
   display: flex;
   gap: 10px;
@@ -3323,7 +3471,7 @@ button.support-name {
 }
 .scenario-year-col .scenario-block-line {
   gap: 4px;
-  align-items: baseline;
+  align-items: flex-start;
   font-size: 12px;
   letter-spacing: -0.02em;
   line-height: 1.35;
@@ -3331,15 +3479,17 @@ button.support-name {
 .scenario-year-col .scenario-block-line span {
   min-width: 0;
   flex: 1 1 auto;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  word-break: keep-all;
 }
 .scenario-year-col .scenario-block-line b {
   flex: 0 0 auto;
   white-space: nowrap;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  padding-top: 1px;
 }
 .scenario-group-ex-person .scenario-year-cols.years-2 {
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
@@ -4038,6 +4188,12 @@ button.support-name {
 .tax-line .tax-money-won { font-size: 12px; font-weight: 500; white-space: nowrap; }
 .tax-line.key .tax-money-won { font-weight: 700; }
 .tax-line.hl .tax-money-won { font-weight: 800; }
+.tax-line-note {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: right;
+  margin: -1px 0 3px;
+}
 .tax-line.mute,
 .tax-line.mute b {
   color: var(--muted);

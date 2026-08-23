@@ -43,8 +43,10 @@ const files = [
   "landing/js/contract-engine.js",
   "landing/js/campaign-config.js",
   "landing/js/link-gate.js",
+  "landing/js/pulse-engine.js",
   "test/cases.js",
-  "test/contract-cases.js"
+  "test/contract-cases.js",
+  "test/phase-b-cases.js"
 ];
 
 const context = {

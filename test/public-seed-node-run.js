@@ -76,8 +76,8 @@ if (json.indexOf("메리디안") >= 0 || json.indexOf("써니스") >= 0 || seed.
   process.exit(1);
 }
 const feeNames = (seed.revenueFees || []).map(function (f) { return f.name; });
-if (feeNames.indexOf("법인 운영·관리비(예시)") < 0 || feeNames.indexOf("매니지먼트·프로젝트 진행비(예시)") < 0) {
-  console.log("FAIL public-seed: 중립 수수료 명칭이 없습니다", feeNames);
+if (feeNames.indexOf("작품·광고 영업 수수료(예시)") < 0 || feeNames.indexOf("재무 아웃소싱 수수료(예시)") < 0) {
+  console.log("FAIL public-seed: 예시 수수료 명칭이 없습니다", feeNames);
   process.exit(1);
 }
-console.log("PASS public-seed: 실제 클라이언트 값 없음 · 수수료 명칭 중립화 확인");
+console.log("PASS public-seed: 실제 클라이언트 값 없음 · 예시 수수료 명칭 확인");

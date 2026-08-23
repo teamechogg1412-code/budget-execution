@@ -7,6 +7,13 @@
     return '<span class="with-unit' + (cls ? " " + cls : "") + '">' + inner + '<span class="unit">' + esc(unit) + "</span></span>";
   }
 
+  var ESTIMATE_DISCLAIMER = "결과는 시뮬레이션 예상치이며 실제 세무 신고액과 다를 수 있습니다. 법률·세무 자문이 아닙니다.";
+
+  function estimateDisclaimerHtml(extraClass) {
+    return '<p class="estimate-disclaimer' + (extraClass ? " " + extraClass : "") + '">' +
+      ESTIMATE_DISCLAIMER + "</p>";
+  }
+
   function moneyInput(path, value, extra) {
     return withUnit(
       '<input type="text" inputmode="numeric" data-path="' + esc(path) + '" data-kind="money" value="' +
@@ -731,6 +738,10 @@
         html += renderPeriodMode(p, e, start, end);
         html += '<div class="inline cost-flags">';
         html += '<label class="check"><input type="checkbox" data-path="' + p + 'insure" data-kind="bool"' + (e.insure ? " checked" : "") + ">보험 여부</label>";
+        if (e.insure) {
+          html += '<label class="check"><input type="checkbox" data-path="' + p + 'insureLimited" data-kind="bool"' +
+            (e.insureLimited ? " checked" : "") + ">고용·산재보험 제외(대표이사 등)</label>";
+        }
         html += '<label class="check"><input type="checkbox" data-path="' + p + 'meal" data-kind="bool"' + (e.meal ? " checked" : "") + ">식대 여부</label>";
         html += '<label class="check"><input type="checkbox" data-path="' + p + 'severance" data-kind="bool"' + (e.severance ? " checked" : "") + ">퇴직 여부</label>";
         html += '<label class="check"><input type="checkbox" data-path="' + p + 'include" data-kind="bool"' + (included ? " checked" : "") + ">포함</label>";
@@ -941,7 +952,7 @@
       html += '<div class="field"><label class="check"><input type="checkbox" data-path="' + p +
         'include" data-kind="bool"' + (included ? " checked" : "") + ">포함</label></div>";
       html += "</div>";
-      html += '<p class="muted small">원본은 시뮬레이션 설정 &gt; 회사 지원입니다. 여기서 금액과 포함 여부를 바로 수정할 수 있습니다.</p>';
+      html += '<p class="muted small">원본은 시뮬레이션 설정 &gt; 기존 회사 계약 조건입니다. 여기서 금액과 포함 여부를 바로 수정할 수 있습니다.</p>';
       html += "</div></details>";
     });
     return html;
@@ -1274,6 +1285,7 @@
     var exEV = App.Money.roundWon((scenarios.exclusiveContract || {}).controlledEconomicValue);
     var evDelta = App.Money.roundWon((cmp.deltas || {}).controlledEconomicValue);
     var html = '<div class="card"><h2>1인 기획사 vs 기존 회사 전속</h2>';
+    html += estimateDisclaimerHtml("estimate-disclaimer-inline");
     html += '<div class="dash-metrics">';
     html += dashMetric("1인 기획사 통제 경제가치", soloEV, "hero" + (evDelta >= 0 ? " good" : ""));
     html += dashMetric("기존 회사 전속 통제 경제가치", exEV);
@@ -1360,6 +1372,8 @@
     html += renderDashPnlCard(run.result, "손익계산서 (" + label + ")");
     html += renderDashEvCard(run.cmp);
     html += "</div></div>";
+    html += estimateDisclaimerHtml();
+    html += "</div>";
     return html;
   }
 
@@ -1380,7 +1394,7 @@
     [
       { id: "basics", label: "기본 설정" },
       { id: "org", label: "조직·인건비" },
-      { id: "support", label: "회사 지원" },
+      { id: "support", label: "기존 회사 계약 조건" },
       { id: "fees", label: "수수료·정책" },
       { id: "tax", label: "세금·비교조건" },
       { id: "settings", label: "설정" }
@@ -1497,12 +1511,13 @@
     var html = '<div class="view-simulation">';
     html += renderSimTabs(tab);
     if (tab === "org") html += renderSimOrg(state, result, ui);
-    else if (tab === "support") html += renderSupportPolicies(state, ui);
+    else if (tab === "support") html += renderExclusiveContractSettings(state, ui) + renderSupportPolicies(state, ui);
     else if (tab === "fees") html += renderRevenueFees(state, result);
     else if (tab === "tax") html += renderScenarioSettings(state, result, ui);
     else if (tab === "settings") html += renderSettings(state, ui);
     else html += renderSimBasics(state, result);
     html += '<p class="muted small sim-status" data-computed="sim-status">' + simStatusText(state, months) + "</p>";
+    html += estimateDisclaimerHtml();
     html += "</div>";
     return html;
   }
@@ -1515,6 +1530,7 @@
     html += "</div>";
     html += renderConfirmedContracts(state, result);
     html += "</div></div>";
+    html += estimateDisclaimerHtml();
     if (ui && ui.revenueRateHelpOpen) html += renderRevenueRateHelpModal(state);
     return html;
   }
@@ -1543,14 +1559,33 @@
     return opts;
   }
 
+  function feePeriodYears(state) {
+    var start = state && state.profile && state.profile.startMonth;
+    var end = state && state.profile && state.profile.endMonth;
+    var months = App.Month.getSimulationMonths
+      ? App.Month.getSimulationMonths(start, end)
+      : [];
+    var years = [];
+    var seen = {};
+    for (var i = 0; i < months.length; i++) {
+      var y = String(months[i] || "").slice(0, 4);
+      if (!/^\d{4}$/.test(y) || seen[y]) continue;
+      seen[y] = true;
+      years.push(y);
+    }
+    return years;
+  }
+
   function renderRevenueFees(state, result) {
     var fees = state.revenueFees || [];
     var totals = (result && result.revenueFees && result.revenueFees.totalsByFee) || {};
+    var periodYears = feePeriodYears(state);
     var grand = 0;
     var html = '<div class="card sim-compact">';
     html += '<div class="section-title"><h2>매출 연동 수수료</h2>';
     html += '<button type="button" class="btn" data-action="add-fee">+ 수수료 항목</button></div>';
-    html += '<p class="muted small">전체 매출(기간 내 예산에 반영되는 입금액) × 수수료율로 자동 계산됩니다.<br>수수료율이나 매출이 바뀌면 즉시 재계산됩니다.</p>';
+    html += '<p class="example-warning"><span class="example-warning-label">중요</span>아래 명칭·요율은 확정값이 아니라 예시 값입니다. 실제 계약 조건에 맞게 직접 수정해서 쓰세요.</p>';
+    html += '<p class="muted small">전체 매출(기간 내 예산에 반영되는 입금액) × 수수료율로 자동 계산됩니다.<br>수수료율 칸의 <b>기본</b>은 전체 폴백이고, 그 아래 연도 칸이 비면 기본값을 씁니다.</p>';
     if (!fees.length) {
       html += '<p class="muted">등록된 매출 연동 수수료가 없습니다.</p>';
     } else {
@@ -1562,9 +1597,37 @@
         if (included) grand += amt;
         var pctVal = Math.round(App.Money.toSafeNumber(fee.rate) * 10000) / 100;
         html += "<tr" + (included ? "" : ' class="muted"') + ">";
-        html += "<td>" + textInput(prefix + "name", fee.name, 'placeholder="예: 법인 운영·관리비"') + "</td>";
+        html += "<td>" + textInput(prefix + "name", fee.name, 'placeholder="예: 작품·광고 영업 수수료"') + "</td>";
         html += "<td>" + selectInput(prefix + "revenueScope", fee.revenueScope || fee.basis || "totalRevenue", revenueScopeOptions()) + "</td>";
-        html += '<td class="num fee-rate-cell">' + percentInput(prefix + "rate", pctVal, 'data-kind="fee-rate"', "compact-pct") + "</td>";
+        html += '<td class="num fee-rate-cell">';
+        html += '<div class="fee-rate-stack">';
+        html += '<div class="fee-rate-base">';
+        html += '<span class="fee-rate-base-label">기본</span>';
+        html += percentInput(prefix + "rate", pctVal, 'data-kind="fee-rate"', "compact-pct");
+        html += "</div>";
+        if (periodYears.length) {
+          html += '<div class="fee-year-rates" title="비우면 기본 수수료율 적용">';
+          periodYears.forEach(function (y) {
+            var yMap = fee.rateByYear || {};
+            var hasY = Object.prototype.hasOwnProperty.call(yMap, y) ||
+              Object.prototype.hasOwnProperty.call(yMap, Number(y));
+            var yRaw = hasY ? (yMap[y] != null ? yMap[y] : yMap[Number(y)]) : null;
+            var yPct = hasY && yRaw != null && yRaw !== ""
+              ? Math.round(App.Money.toSafeNumber(yRaw) * 10000) / 100
+              : "";
+            html += '<label class="fee-year-rate">';
+            html += "<span>" + esc(y) + "</span>";
+            html += percentInput(
+              prefix + "rateByYear." + y,
+              yPct,
+              'data-kind="fee-rate" placeholder="' + esc(String(pctVal)) + '"',
+              "fee-year-pct"
+            );
+            html += "</label>";
+          });
+          html += "</div>";
+        }
+        html += "</div></td>";
         html += "<td>" + selectInput(prefix + "category", fee.category, feeCategoryOptions()) + "</td>";
         html += '<td><input type="checkbox" data-path="' + esc(prefix + "include") + '" data-kind="bool"' + (included ? " checked" : "") + "></td>";
         html += '<td class="num fee-amt-cell"><span data-computed="fee-amount" data-fee-id="' + esc(fee.id) + '">' + App.Format.formatWon(amt) + "</span></td>";
@@ -1625,15 +1688,26 @@
   function soloPayerOptions() {
     return [
       { id: "company", label: "법인 부담" },
-      { id: "actor", label: "배우 부담" }
+      { id: "actor", label: "배우 부담" },
+      { id: "share", label: "나눠서 부담" }
     ];
   }
 
   function exclusivePayerOptions() {
     return [
       { id: "company", label: "회사 부담" },
-      { id: "actor", label: "배우 부담" }
+      { id: "actor", label: "배우 부담" },
+      { id: "share", label: "나눠서 부담" }
     ];
+  }
+
+  function supportShareFields(path, rate, companyLabel) {
+    rate = Math.max(0, Math.min(1, App.Money.toRatio(rate)));
+    return '<div class="field support-share-field"><label>' + esc(companyLabel) + ' 부담률</label>' +
+      percentInput(path, pctView(rate), 'data-kind="percent"') + "</div>" +
+      '<div class="field support-share-field"><label>배우 부담률</label>' +
+      '<div class="support-share-complement" data-share-complement="' + esc(path) + '">' +
+      esc(pctView(1 - rate)) + "%</div></div>";
   }
 
   function supportModeLabel(mode) {
@@ -1662,7 +1736,7 @@
     var html = '<div class="support-item-body">';
     html += '<div class="sim-grid-3">';
     html += '<div class="field"><label>밥차 기본 단가</label>' +
-      withUnit(moneyInput(p + "unitAmount", item.unitAmount), "원 / 회") + "</div>";
+      withUnit(moneyInput(p + "unitAmount", item.unitAmount), "/ 회") + "</div>";
     html += "</div>";
     html += "<h4>연동 작품</h4>";
     if (!rows.length) {
@@ -1706,7 +1780,7 @@
   function renderVehicleLinkedPolicyBody(item, field, state) {
     var vehicles = (state.vehicles || []).filter(function (v) { return v && v.include !== false && App.Money.toSafeNumber(v[field]) > 0; });
     var html = '<div class="support-item-body">';
-    html += '<p class="muted small">이 항목은 시뮬레이션 설정 &gt; 회사 지원 상단의 <b>차량</b> 카드에서 자동 집계됩니다. 여기서는 직접 수정할 수 없고, 금액을 바꾸려면 차량 카드에서 바꾸세요.</p>';
+    html += '<p class="muted small">이 항목은 시뮬레이션 설정 &gt; 기존 회사 계약 조건 상단의 <b>차량</b> 카드에서 자동 집계됩니다. 여기서는 직접 수정할 수 없고, 금액을 바꾸려면 차량 카드에서 바꾸세요.</p>';
     if (!vehicles.length) {
       html += '<p class="muted small">포함된 차량 중 금액이 있는 차량이 없습니다.</p>';
     } else {
@@ -1819,9 +1893,15 @@
       html += '<div class="field"><label>비용 분류</label>' +
         selectInput(p + "costClass", item.costClass || "sga", supportCostClassOptions()) + "</div>";
       html += '<div class="field"><label>1인 기획사</label>' +
-        selectInput(p + "soloPayer", item.soloPayer === "actor" ? "actor" : "company", soloPayerOptions()) + "</div>";
+        selectInput(p + "soloPayer", item.soloPayer || "company", soloPayerOptions()) + "</div>";
       html += '<div class="field"><label>기존 회사</label>' +
-        selectInput(p + "exclusivePayer", item.exclusivePayer === "actor" ? "actor" : "company", exclusivePayerOptions()) + "</div>";
+        selectInput(p + "exclusivePayer", item.exclusivePayer || "company", exclusivePayerOptions()) + "</div>";
+      if (item.soloPayer === "share") {
+        html += supportShareFields(p + "soloCompanyShareRate", item.soloCompanyShareRate, "법인");
+      }
+      if (item.exclusivePayer === "share") {
+        html += supportShareFields(p + "exclusiveCompanyShareRate", item.exclusiveCompanyShareRate, "회사");
+      }
       html += "</div>";
       html += '<div class="support-item-flags">';
       html += '<label class="check"><input type="checkbox" data-path="' + p +
@@ -2061,10 +2141,6 @@
     App.Defaults.ensureScenarioSettings(state);
     var ids = state.settings.scenarioComparison.enabledScenarioIds || [];
     var solo = state.settings.scenarios.soloAgency;
-    var contract = state.settings.scenarios.exclusiveContract;
-    var split = App.Defaults.derivedSplitBasis(contract.costBurdenRules);
-    var shareSum = App.Money.toSafeNumber(contract.companyShareRate) + App.Money.toSafeNumber(contract.actorShareRate);
-    var shareOk = Math.abs(shareSum - 1) < 0.0005;
     var employees = [{ id: "", label: "자동 (대표 역할 직원)" }].concat((state.employees || []).map(function (emp) {
       return { id: emp.id, label: ((emp.name || "직원") + (emp.role ? " · " + emp.role : "")) };
     }));
@@ -2157,45 +2233,58 @@
       ? App.Defaults.ownerProfitShareWithholding(1)
       : { rate: 0.033 };
     html += "<h3>수익배분</h3>";
-    html += '<p class="muted small">작품·영업 매출에 배분율을 곱합니다. 사업소득세·주민세 3.3%입니다. 배당과 별도이며, 매출이 잡힌 달에 매출원가(수익정산)로 프로젝트마다 반영합니다.</p>';
-    html += '<div class="div-year-wrap"><table class="div-year-table"><thead><tr>';
-    html += "<th>구분</th><th class=\"num\">기간 매출</th><th class=\"num\">수익배분율</th>";
-    html += "<th class=\"num\">배분액</th><th class=\"num\">납부할 세율</th>";
-    html += "</tr></thead><tbody>";
-    html += "<tr><td>작품</td>";
-    html += '<td class="num">' + App.Format.formatWon(resolvedShare.workRevenue) + "</td>";
-    html += '<td class="num">' + percentInput("settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate", pctView(solo.ownerPayout.profitShareWorkRate), 'data-kind="percent"') + "</td>";
-    html += '<td class="num">' + App.Format.formatWon(resolvedShare.workAmount) + '<div class="auto">자동</div></td>';
-    html += '<td class="num">' + esc(pctView(shareTax.rate)) + "%</td></tr>";
-    html += "<tr><td>영업</td>";
-    html += '<td class="num">' + App.Format.formatWon(resolvedShare.salesRevenue) + "</td>";
-    html += '<td class="num">' + percentInput("settings.scenarios.soloAgency.ownerPayout.profitShareSalesRate", pctView(solo.ownerPayout.profitShareSalesRate), 'data-kind="percent"') + "</td>";
-    html += '<td class="num">' + App.Format.formatWon(resolvedShare.salesAmount) + '<div class="auto">자동</div></td>';
-    html += '<td class="num">' + esc(pctView(shareTax.rate)) + "%</td></tr>";
-    html += "</tbody></table></div>";
-    var shareExpenseYear = (state.settings.personalTaxCommon && state.settings.personalTaxCommon.year) || 2026;
-    var shareExpenseInfo = App.Defaults.resolvedProfitShareExpenseRate
-      ? App.Defaults.resolvedProfitShareExpenseRate(state, shareExpenseYear)
-      : null;
-    if (shareExpenseInfo) {
-      html += '<div class="field" style="max-width:280px"><label>사업소득 추계 필요경비율 (' +
-        esc(shareExpenseInfo.businessName) + " · " + esc(shareExpenseInfo.businessCode) + ")</label>" +
-        percentInput("settings.scenarios.soloAgency.ownerPayout.profitShareExpenseRateOverride",
-          pctView(shareExpenseInfo.appliedRate), 'data-kind="percent"') + "</div>";
-      if (shareExpenseInfo.missing) {
-        html += '<p class="muted small">' + shareExpenseInfo.taxYear +
-          '년 귀속 공식 경비율 자료가 아직 없습니다. 적용값을 직접 입력해주세요.</p>';
-      } else {
-        html += '<p class="muted small">공식 단순경비율(' + shareExpenseInfo.taxYear + '년 귀속) ' +
-          pctView(shareExpenseInfo.officialRate) + '% · ' +
-          (shareExpenseInfo.isOverride ? "사용자 설정값 사용 중" : "공식값 사용 중") + "</p>";
+    html += '<p class="muted small">작품·영업 매출에 배분율을 곱합니다. 사업소득세·주민세 3.3%입니다. 배당과 별도이며, 매출이 잡힌 달에 매출원가(수익정산)로 프로젝트마다 반영합니다. 설계안함이면 월별 분석·시나리오 비교에 수익정산을 넣지 않습니다.</p>';
+    var shareOn = App.Defaults.isProfitShareOn
+      ? App.Defaults.isProfitShareOn(solo.ownerPayout)
+      : true;
+    html += '<div class="plan-filter dividend-on-toggle">';
+    html += '<label class="check"><input type="radio" name="solo-share-on" data-action="set-profit-share-on" data-on="1"' +
+      (shareOn ? " checked" : "") + "> 설계함</label>";
+    html += '<label class="check"><input type="radio" name="solo-share-on" data-action="set-profit-share-on" data-on="0"' +
+      (shareOn ? "" : " checked") + "> 설계안함</label>";
+    html += "</div>";
+    if (shareOn) {
+      html += '<div class="div-year-wrap"><table class="div-year-table"><thead><tr>';
+      html += "<th>구분</th><th class=\"num\">기간 매출</th><th class=\"num\">수익배분율</th>";
+      html += "<th class=\"num\">배분액</th><th class=\"num\">납부할 세율</th>";
+      html += "</tr></thead><tbody>";
+      html += "<tr><td>작품</td>";
+      html += '<td class="num">' + App.Format.formatWon(resolvedShare.workRevenue) + "</td>";
+      html += '<td class="num">' + percentInput("settings.scenarios.soloAgency.ownerPayout.profitShareWorkRate", pctView(solo.ownerPayout.profitShareWorkRate), 'data-kind="percent"') + "</td>";
+      html += '<td class="num">' + App.Format.formatWon(resolvedShare.workAmount) + '<div class="auto">자동</div></td>';
+      html += '<td class="num">' + esc(pctView(shareTax.rate)) + "%</td></tr>";
+      html += "<tr><td>영업</td>";
+      html += '<td class="num">' + App.Format.formatWon(resolvedShare.salesRevenue) + "</td>";
+      html += '<td class="num">' + percentInput("settings.scenarios.soloAgency.ownerPayout.profitShareSalesRate", pctView(solo.ownerPayout.profitShareSalesRate), 'data-kind="percent"') + "</td>";
+      html += '<td class="num">' + App.Format.formatWon(resolvedShare.salesAmount) + '<div class="auto">자동</div></td>';
+      html += '<td class="num">' + esc(pctView(shareTax.rate)) + "%</td></tr>";
+      html += "</tbody></table></div>";
+      var shareExpenseYear = (state.settings.personalTaxCommon && state.settings.personalTaxCommon.year) || 2026;
+      var shareExpenseInfo = App.Defaults.resolvedProfitShareExpenseRate
+        ? App.Defaults.resolvedProfitShareExpenseRate(state, shareExpenseYear)
+        : null;
+      if (shareExpenseInfo) {
+        html += '<div class="field" style="max-width:280px"><label>사업소득 추계 필요경비율 (' +
+          esc(shareExpenseInfo.businessName) + " · " + esc(shareExpenseInfo.businessCode) + ")</label>" +
+          percentInput("settings.scenarios.soloAgency.ownerPayout.profitShareExpenseRateOverride",
+            pctView(shareExpenseInfo.appliedRate), 'data-kind="percent"') + "</div>";
+        if (shareExpenseInfo.missing) {
+          html += '<p class="muted small">' + shareExpenseInfo.taxYear +
+            '년 귀속 공식 경비율 자료가 아직 없습니다. 적용값을 직접 입력해주세요.</p>';
+        } else {
+          html += '<p class="muted small">공식 단순경비율(' + shareExpenseInfo.taxYear + '년 귀속) ' +
+            pctView(shareExpenseInfo.officialRate) + '% · ' +
+            (shareExpenseInfo.isOverride ? "사용자 설정값 사용 중" : "공식값 사용 중") + "</p>";
+        }
+        if (shareExpenseInfo.isOverride) {
+          html += '<button type="button" class="btn btn-sm" data-action="reset-profit-share-expense-rate">공식값으로 복원</button>';
+        }
+        if (shareExpenseInfo.source) {
+          html += '<p class="muted small">출처: ' + esc(shareExpenseInfo.source) + "</p>";
+        }
       }
-      if (shareExpenseInfo.isOverride) {
-        html += '<button type="button" class="btn btn-sm" data-action="reset-profit-share-expense-rate">공식값으로 복원</button>';
-      }
-      if (shareExpenseInfo.source) {
-        html += '<p class="muted small">출처: ' + esc(shareExpenseInfo.source) + "</p>";
-      }
+    } else {
+      html += '<p class="muted small">설계안함 — 월별 분석·비용·시나리오 비교에 수익정산을 넣지 않습니다. 율은 설계함으로 바꾸면 다시 씁니다.</p>';
     }
     var liqMode = (state.settings.tax && state.settings.tax.liquidationMode) === "deemedDividend"
       ? "deemedDividend"
@@ -2225,10 +2314,20 @@
     html += "</fieldset>";
     html += "</div></details>";
 
-    html += '<details class="card scenario-acc" data-tax-fold="scenario-exclusive"' +
+    return html;
+  }
+
+  function renderExclusiveContractSettings(state, ui) {
+    App.Defaults.ensureScenarioSettings(state);
+    var contract = state.settings.scenarios.exclusiveContract;
+    var split = App.Defaults.derivedSplitBasis(contract.costBurdenRules);
+    var shareSum = App.Money.toSafeNumber(contract.companyShareRate) + App.Money.toSafeNumber(contract.actorShareRate);
+    var shareOk = Math.abs(shareSum - 1) < 0.0005;
+    var html = '<details class="card scenario-acc" data-tax-fold="scenario-exclusive"' +
       (taxFoldOpen(ui, "scenario-exclusive") ? " open" : "") + ">";
-    html += "<summary>기존 회사 전속</summary>";
+    html += "<summary>기존 회사 전속 계약 조건</summary>";
     html += '<div class="scenario-acc-body">';
+    html += '<p class="muted small">배우님 상황에 맞게 바꿔주세요 — 지금 소속사와의 실제 계약 조건(배분율, 비용 부담 방식)을 입력하면 비교가 정확해집니다.</p>';
     html += '<div class="row-fields">';
     html += '<div class="field"><label>회사 배분율</label>' +
       percentInput("settings.scenarios.exclusiveContract.companyShareRate", pctView(contract.companyShareRate), 'data-kind="percent"') + "</div>";
@@ -2279,7 +2378,7 @@
       html += '<div class="row-fields">';
       html += '<div class="field"><label>항목</label>' + textInput(p + "name", item.name, 'placeholder="항목"') + "</div>";
       html += '<div class="field"><label>1회 단가</label>' +
-        withUnit(moneyInput(p + "unitAmount", item.unitAmount), "원 / 회") + "</div>";
+        withUnit(moneyInput(p + "unitAmount", item.unitAmount), "/ 회") + "</div>";
       html += '<div class="field"><label>횟수</label>' +
         withUnit(textInput(p + "quantity", item.quantity, 'data-kind="count"'), "회") + "</div>";
       html += '<div class="field"><label>합계</label><div class="readonly">' + esc(App.Format.formatWon(lineAmt)) + "</div></div>";
@@ -2291,6 +2390,30 @@
       html += "</div></div>";
     });
     html += '<button type="button" class="btn" data-action="add-actor-personal-cost">+ 배우 개인 활동비</button>';
+    var actorExpenseYear = (state.settings.personalTaxCommon && state.settings.personalTaxCommon.year) || 2026;
+    var actorExpenseInfo = App.Defaults.resolvedExclusiveActorExpenseRate
+      ? App.Defaults.resolvedExclusiveActorExpenseRate(state, actorExpenseYear)
+      : null;
+    if (actorExpenseInfo) {
+      html += '<div class="field" style="max-width:280px"><label>사업소득 추계 필요경비율 (' +
+        esc(actorExpenseInfo.businessName) + " · " + esc(actorExpenseInfo.businessCode) + ")</label>" +
+        percentInput("settings.scenarios.exclusiveContract.actorExpenseRateOverride",
+          pctView(actorExpenseInfo.appliedRate), 'data-kind="percent"') + "</div>";
+      if (actorExpenseInfo.missing) {
+        html += '<p class="muted small">' + actorExpenseInfo.taxYear +
+          '년 귀속 공식 경비율 자료가 아직 없습니다. 적용값을 직접 입력해주세요.</p>';
+      } else {
+        html += '<p class="muted small">공식 단순경비율(' + actorExpenseInfo.taxYear + '년 귀속) ' +
+          pctView(actorExpenseInfo.officialRate) + '% · ' +
+          (actorExpenseInfo.isOverride ? "사용자 설정값 사용 중" : "공식값 사용 중") + "</p>";
+      }
+      if (actorExpenseInfo.isOverride) {
+        html += '<button type="button" class="btn btn-sm" data-action="reset-exclusive-actor-expense-rate">공식값으로 복원</button>';
+      }
+      if (actorExpenseInfo.source) {
+        html += '<p class="muted small">출처: ' + esc(actorExpenseInfo.source) + "</p>";
+      }
+    }
     html += renderPersonalTaxFields(
       "settings.scenarios.exclusiveContract.personalTax",
       contract.personalTax,
@@ -3664,7 +3787,7 @@
     } else if (tab === "rent2f") {
       html += renderRent2fTab(state, ui);
     } else if (tab === "funding") {
-      html += '<p class="muted small cost-intro">현금은 지출되지만 보증금 또는 자산으로 남는 항목입니다. 보증금은 손익 비용으로 처리하지 않습니다. 차량 보증금은 시뮬레이션 설정 &gt; 회사 지원에서 수정합니다.</p>';
+      html += '<p class="muted small cost-intro">현금은 지출되지만 보증금 또는 자산으로 남는 항목입니다. 보증금은 손익 비용으로 처리하지 않습니다. 차량 보증금은 시뮬레이션 설정 &gt; 기존 회사 계약 조건에서 수정합니다.</p>';
       html += '<details class="compat-hidden" data-cost-sec="deposits" open></details>';
       html += '<details class="compat-hidden" data-cost-sec="assets" open></details>';
       html += '<details class="compat-hidden" data-cost-sec="inflows" open></details>';
@@ -3917,6 +4040,7 @@
     }
 
     html += "</div></div>";
+    html += estimateDisclaimerHtml();
     return html;
   }
 
@@ -4682,9 +4806,24 @@
     return html;
   }
 
-  function payoutFitTrialOf(ui, fit) {
+  function payoutFitTrialOf(ui, fit, state) {
     if (ui && ui.payoutFitTrial) return ui.payoutFitTrial;
-    return defaultPayoutFitTrial(fit);
+    var saved = state && state.settings && state.settings.payoutFitDraft;
+    var trial;
+    if (saved && typeof saved === "object") {
+      trial = JSON.parse(JSON.stringify(saved));
+    } else {
+      trial = defaultPayoutFitTrial(fit);
+    }
+    // 월별 수익정산 on/off는 시뮬레이션 설정이 기준. 초안이 어긋나면 설정에 맞춤.
+    var payout = state && state.settings && state.settings.scenarios
+      && state.settings.scenarios.soloAgency && state.settings.scenarios.soloAgency.ownerPayout;
+    if (payout && App.Defaults.isProfitShareOn) {
+      trial.profitSettleOn = App.Defaults.isProfitShareOn(payout);
+      if (!trial.profitSettleOn) trial.profitSettle = 0;
+    }
+    if (ui) ui.payoutFitTrial = trial;
+    return trial;
   }
 
   function renderPayoutFitHelpModal(fit) {
@@ -4811,7 +4950,7 @@
     };
   }
 
-  function renderPayoutFitSplitTrial(trialIn, trial, trialYears, ui) {
+  function renderPayoutFitSplitTrial(trialIn, trial, trialYears, ui, cashSnapshot) {
     var settleOn = !!(trial.profitSettleOn);
     var divOn = !!(trial.dividendOn);
     var settleOpen = payoutFitSectionOpen(ui, "profitSettle", settleOn);
@@ -4861,6 +5000,19 @@
       }
     }
 
+    html += '<div data-computed="payout-fit-op-years">';
+    html += payoutFitSplitLabeledRow("영업이익", trialYears.map(function (y) {
+      return payoutFitSplitCell(
+        '<b class="payout-fit-year-amt payout-fit-year-amt-tight' + (y.operatingProfit < 0 ? " is-neg" : "") +
+          '" data-computed="payout-fit-amt-op-' + y.year + '">' +
+          esc(App.Format.formatWon(y.operatingProfit)) + "</b>"
+      );
+    }).join(""), "is-mute");
+    html += "</div>";
+    html += '<div data-computed="payout-fit-cash-status">' +
+      renderPayoutFitCashMonitor(cashSnapshot, trialYears) + "</div>";
+    html += '<div data-computed="payout-fit-loss-warning">' + payoutFitLossWarning(trialYears, cashSnapshot) + "</div>";
+
     html += payoutFitSectionFoldRow(
       "dividend",
       "배당",
@@ -4873,14 +5025,6 @@
         payoutFitOnOff("dividendOn", trialIn.dividendOn != null ? trialIn.dividendOn : trial.dividendOn)
       );
       if (divOn) {
-        html += '<div data-computed="payout-fit-op-years">';
-        html += payoutFitSplitLabeledRow("영업이익", trialYears.map(function (y) {
-          return payoutFitSplitCell(
-            '<b class="payout-fit-year-amt payout-fit-year-amt-tight" data-computed="payout-fit-amt-op-' + y.year + '">' +
-              esc(App.Format.formatWon(y.operatingProfit)) + "</b>"
-          );
-        }).join(""), "is-mute");
-        html += "</div>";
         html += payoutFitSplitLabeledRow("요율", trialYears.map(function (y) {
           return payoutFitSplitCell(
             payoutFitPercentInput(
@@ -4907,6 +5051,18 @@
     html += "</div>";
     html += "</div>";
     return html;
+  }
+
+  function payoutFitLossWarning(trialYears, cashSnapshot) {
+    var lossYears = (trialYears || []).filter(function (y) { return App.Money.roundWon(y.operatingProfit) < 0; });
+    if (!lossYears.length) return "";
+    var years = lossYears.map(function (y) { return y.year; }).join(", ");
+    var cashText = cashSnapshot && cashSnapshot.short
+      ? "현재 입력 기준으로도 현금 부족이 예상되어 추가 자금 또는 지급 시기 조정이 필요합니다."
+      : "현재 입력된 기초현금과 입금 시점 기준으로는 추가 자금이 필요하지 않습니다.";
+    return '<p class="payout-fit-warning">' + esc(years) +
+      "년은 설립 초기 급여·수익배분 배치에 따라 영업손실이 예상됩니다. " + cashText +
+      " 손실은 요건 충족 시 이월결손금으로 다음 연도 과세소득과 상계될 수 있으므로 지급 금액과 시기를 함께 설계해보세요.</p>";
   }
 
   function payoutFitTaxOpen(ui, id) {
@@ -5031,9 +5187,74 @@
     var html = taxResultLine("기간 급여", App.Format.formatWon(trial.salaryInc));
     html += taxResultLine("수익배분", App.Format.formatWon(trial.profitSettle));
     html += taxResultLine("배당", App.Format.formatWon(trial.dividend));
-    html += taxResultLine("보험·퇴직 회사부담", App.Format.formatWon(trial.insurance + trial.severance), { mute: true });
+    html += taxResultLine("보험·퇴직 회사부담", App.Format.formatWon(trial.insurance + trial.severance),
+      { mute: true, note: "대표자 몫 · 왼쪽 운영원가엔 미포함" });
     html += taxResultLine("대표 인출·부담 합계", App.Format.formatWon(trial.ownerCompanyCost), { key: true });
     html += taxResultLine(trial.slack < 0 ? "초과" : "남은 가용재원", App.Format.formatWon(Math.abs(trial.slack)), { total: true });
+    return html;
+  }
+
+  function payoutFitCashSnapshot(state, result, trialIn, evaluateTrial) {
+    var cashResult = result;
+    if (evaluateTrial && App.Engine.previewOwnerPayoutTrial) {
+      var preview = App.Engine.previewOwnerPayoutTrial(state, result, trialIn);
+      if (preview && preview.result) cashResult = preview.result;
+    }
+    var rows = (cashResult && cashResult.months) || [];
+    var byYear = {};
+    var overallMin = null;
+    var overallMonth = "";
+    rows.forEach(function (row) {
+      var year = Number(String((row && row.month) || "").slice(0, 4));
+      if (!year) return;
+      var closing = App.Money.roundWon(row.closing);
+      if (!byYear[year]) byYear[year] = { min: closing, end: closing, minMonth: row.month };
+      if (closing < byYear[year].min) {
+        byYear[year].min = closing;
+        byYear[year].minMonth = row.month;
+      }
+      byYear[year].end = closing;
+      if (overallMin == null || closing < overallMin) {
+        overallMin = closing;
+        overallMonth = row.month;
+      }
+    });
+    return {
+      byYear: byYear,
+      min: overallMin == null ? 0 : overallMin,
+      minMonth: overallMonth,
+      end: rows.length ? App.Money.roundWon(rows[rows.length - 1].closing) : 0,
+      short: overallMin != null && overallMin < 0
+    };
+  }
+
+  function renderPayoutFitCashMonitor(snapshot, years) {
+    snapshot = snapshot || { byYear: {}, min: 0, end: 0, short: false };
+    years = years || [];
+    var html = '<div class="payout-fit-cash-monitor' + (snapshot.short ? " is-short" : "") + '">';
+    if (years.length >= 2) {
+      html += payoutFitSplitLabeledRow("손익 상태", years.map(function (y) {
+        var profit = App.Money.roundWon(y.operatingProfit);
+        return payoutFitSplitCell('<b class="payout-fit-year-amt' + (profit < 0 ? " is-loss" : "") + '">' +
+          esc((profit < 0 ? "손실 " : "이익 ") + App.Format.formatWon(Math.abs(profit))) + "</b>");
+      }).join(""), "is-mute");
+      html += payoutFitSplitLabeledRow("추가 필요 자금", years.map(function (y) {
+        var row = snapshot.byYear[y.year] || { min: 0 };
+        var needed = Math.max(0, -App.Money.roundWon(row.min));
+        return payoutFitSplitCell('<b class="payout-fit-year-amt' + (needed > 0 ? " is-neg" : "") + '">' +
+          esc(needed > 0 ? App.Format.formatWon(needed) : "필요 없음") + "</b>");
+      }).join(""), "is-mute");
+    } else {
+      var oneProfit = years[0] ? App.Money.roundWon(years[0].operatingProfit) : 0;
+      html += taxResultLine("손익 상태", (oneProfit < 0 ? "손실 " : "이익 ") + App.Format.formatWon(Math.abs(oneProfit)));
+      html += taxResultLine("추가 필요 자금", snapshot.short ? App.Format.formatWon(Math.max(0, -snapshot.min)) : "필요 없음");
+    }
+    html += '<p class="payout-fit-cash-state">' +
+      (snapshot.short
+        ? "추가 자금 필요 예상 · " + esc(snapshot.minMonth || "기간 중") + " · 약 " +
+          esc(App.Format.formatWon(Math.max(0, -snapshot.min)))
+        : "현재 입력 기준 추가 자금 필요 없음") +
+      "</p></div>";
     return html;
   }
 
@@ -5049,10 +5270,11 @@
       html += "</div></div>";
       return html;
     }
-    var trialIn = payoutFitTrialOf(ui, fit);
+    var trialIn = payoutFitTrialOf(ui, fit, state);
     var trial = App.Engine.evaluateOwnerPayoutTrial
       ? App.Engine.evaluateOwnerPayoutTrial(fit, trialIn)
       : fit.current;
+    var cashSnapshot = payoutFitCashSnapshot(state, result, trialIn, !!(ui && ui.payoutFitTrial));
     html += renderPayoutFitVerdictTag(trial.verdict);
     html += "</div>";
     if (ui && ui.payoutFitHelpOpen) html += renderPayoutFitHelpModal(fit);
@@ -5084,7 +5306,7 @@
     var trialYears = trial.years || [];
     var splitYears = trialYears.length >= 2;
     if (splitYears) {
-      html += renderPayoutFitSplitTrial(trialIn, trial, trialYears, ui);
+      html += renderPayoutFitSplitTrial(trialIn, trial, trialYears, ui, cashSnapshot);
     } else {
       var settleOn1 = !!trial.profitSettleOn;
       var divOn1 = !!trial.dividendOn;
@@ -5124,6 +5346,16 @@
       }
       html += "</div>";
 
+      // 영업이익은 배당 여부와 무관한 모니터링 값이다. 급여·수익배분 변경에 따라 항상 갱신한다.
+      html += '<div class="payout-fit-section payout-fit-operating-monitor" data-computed="payout-fit-op">';
+      html += taxResultLine("영업이익", App.Format.formatWon(trial.operatingProfit), { key: true });
+      html += renderPayoutFitYearLines(trialYears, "operatingProfit");
+      html += "</div>";
+      html += '<div data-computed="payout-fit-cash-status">' +
+        renderPayoutFitCashMonitor(cashSnapshot, trialYears) + "</div>";
+      html += '<div data-computed="payout-fit-loss-warning">' +
+        payoutFitLossWarning(trialYears, cashSnapshot) + "</div>";
+
       html += '<div class="payout-fit-section">';
       html += '<button type="button" class="payout-fit-section-fold-btn' + (divOpen1 ? " is-open" : "") +
         '" data-action="toggle-payout-fit-section" data-id="dividend" aria-expanded="' +
@@ -5135,10 +5367,6 @@
         html += '<div class="payout-fit-field"><label>배당</label>' +
           payoutFitOnOff("dividendOn", trialIn.dividendOn != null ? trialIn.dividendOn : trial.dividendOn) + "</div>";
         if (divOn1) {
-          html += '<div data-computed="payout-fit-op">';
-          html += taxResultLine("영업이익", App.Format.formatWon(trial.operatingProfit), { key: true });
-          html += renderPayoutFitYearLines(trialYears, "operatingProfit");
-          html += "</div>";
           html += '<div class="payout-fit-field"><label>배당 요율</label>' +
             payoutFitPercentInput("dividendRate", trialIn.dividendRate != null ? trialIn.dividendRate : trial.dividendRate) + "</div>";
           html += '<div data-computed="payout-fit-div-years">';
@@ -5190,11 +5418,15 @@
     var ctx = payoutFitViewContext(state, result, ui);
     var fit = App.Engine.analyzeOwnerPayoutFit(ctx.state, ctx.result);
     if (!fit) return;
-    var trial = App.Engine.evaluateOwnerPayoutTrial(fit, payoutFitTrialOf(ui, fit));
+    var trialIn = payoutFitTrialOf(ui, fit, state);
+    var trial = App.Engine.evaluateOwnerPayoutTrial(fit, trialIn);
+    var cashSnapshot = payoutFitCashSnapshot(ctx.state, ctx.result, trialIn, true);
     var poolUsage = card.querySelector("[data-computed='payout-fit-pool-usage']");
     if (poolUsage) poolUsage.innerHTML = renderPayoutFitPoolUsage(trial);
     var poolSummary = card.querySelector("[data-computed='payout-fit-pool-summary']");
     if (poolSummary) poolSummary.textContent = payoutFitRemainingSummary(trial);
+    var cashStatus = card.querySelector("[data-computed='payout-fit-cash-status']");
+    if (cashStatus) cashStatus.innerHTML = renderPayoutFitCashMonitor(cashSnapshot, trial.years || []);
     var salaryYears = card.querySelector("[data-computed='payout-fit-salary-years']");
     if (salaryYears) {
       var splitYears = (trial.years || []).length >= 2;
@@ -5209,10 +5441,15 @@
       var settleAmt = card.querySelector("[data-computed='payout-fit-amt-settle-" + y.year + "']");
       if (settleAmt) settleAmt.textContent = App.Format.formatWon(y.profitSettle);
       var opAmt = card.querySelector("[data-computed='payout-fit-amt-op-" + y.year + "']");
-      if (opAmt) opAmt.textContent = App.Format.formatWon(y.operatingProfit);
+      if (opAmt) {
+        opAmt.textContent = App.Format.formatWon(y.operatingProfit);
+        opAmt.classList.toggle("is-neg", App.Money.roundWon(y.operatingProfit) < 0);
+      }
       var divAmt = card.querySelector("[data-computed='payout-fit-amt-div-" + y.year + "']");
       if (divAmt) divAmt.textContent = App.Format.formatWon(y.dividend);
     });
+    var lossWarning = card.querySelector("[data-computed='payout-fit-loss-warning']");
+    if (lossWarning) lossWarning.innerHTML = payoutFitLossWarning(trial.years, cashSnapshot);
     var settleYears = card.querySelector("[data-computed='payout-fit-settle-years']");
     if (settleYears) settleYears.innerHTML = renderPayoutFitYearLines(trial.years, "profitSettle");
     var opLines = card.querySelector("[data-computed='payout-fit-op']");
@@ -5268,7 +5505,7 @@
     var ctx = payoutFitViewContext(state, result, ui);
     var fit = App.Engine.analyzeOwnerPayoutFit(ctx.state, ctx.result);
     if (!fit) return;
-    if (!ui.payoutFitTrial) ui.payoutFitTrial = defaultPayoutFitTrial(fit);
+    if (!ui.payoutFitTrial) ui.payoutFitTrial = payoutFitTrialOf(ui, fit, state);
     var trial = ui.payoutFitTrial;
     var years = (fit.years || []);
     var parsed = String(key || "").split(".");
@@ -5344,6 +5581,17 @@
       if (trial.profitSettleOn && fit.revenue && trial.profitSettleRate) {
         trial.profitSettle = App.Money.roundWon(fit.revenue * trial.profitSettleRate);
         trial.profitSettleRateByYear = payoutFitCopyToYears(trial.profitSettleRateByYear, years, trial.profitSettleRate);
+      }
+      if (App.Defaults.setOwnerProfitShareOn) {
+        App.Defaults.setOwnerProfitShareOn(state, trial.profitSettleOn);
+      }
+      if (trial.profitSettleOn && trial.profitSettleRate != null) {
+        var payoutLive = state.settings.scenarios.soloAgency.ownerPayout;
+        var liveRate = App.Money.toRatio(trial.profitSettleRate);
+        if (liveRate > 0) {
+          payoutLive.profitShareWorkRate = liveRate;
+          payoutLive.profitShareSalesRate = liveRate;
+        }
       }
       if (!ui.payoutFitSectionOpen) ui.payoutFitSectionOpen = {};
       ui.payoutFitSectionOpen.profitSettle = true;
@@ -6024,11 +6272,14 @@
       : App.Money.roundWon(App.Money.roundWon(slice.taxableIncome) - incomeTax - local);
     var directorCost = App.Money.roundWon(slice.directorCost);
     var actorSupport = App.Money.roundWon(slice.actorSupport);
+    var preTax = App.Money.roundWon(gross - directorCost - actorSupport);
     return {
       gross: gross,
       directorCost: directorCost,
       actorSupport: actorSupport,
-      preTax: App.Money.roundWon(gross - directorCost - actorSupport),
+      preTax: preTax,
+      necessaryExpenses: App.Money.roundWon(d.necessaryExpenses),
+      expenseRate: (d.businessExpenseRateInfo && d.businessExpenseRateInfo.appliedRate) || 0,
       incomeTax: incomeTax,
       localIncomeTax: local,
       net: net
@@ -6234,6 +6485,13 @@
       lines.push({ label: "배우 부담 지원비", amount: v.actorSupport, sign: "out" });
     }
     lines.push({ label: "실과세표준", amount: v.preTax, sign: "result" });
+    if (v.necessaryExpenses) {
+      lines.push({
+        label: "추계 필요경비 " + pctView(v.expenseRate) + "%",
+        amount: v.necessaryExpenses,
+        sign: "out"
+      });
+    }
     if (f) {
       lines.push({ label: "과세표준", amount: f.taxableBase, sign: "result" });
       lines.push({ label: "산출세액", amount: f.assessed, sign: "out" });
@@ -6369,7 +6627,7 @@
       if (v.profitShare) {
         lines.push({ label: "수익배분", amount: v.profitShare, sign: "in" });
         lines.push({
-          label: "추계 필요경비 (" + pctView(v.profitShareExpenseRate) + "%)",
+          label: "추계 필요경비 " + pctView(v.profitShareExpenseRate) + "%",
           amount: v.profitShareExpense,
           sign: "out"
         });
@@ -6440,12 +6698,31 @@
     html += "<h3>배우 개인</h3>";
     html += scenarioYearColsHtml(years, function (year) {
       var v = exclusivePersonYearView(ex, year);
-      return scenarioYearCol(year, [
-        { label: "귀속소득", amount: v.gross, sign: "in" },
+      var lines = [
+        { label: "귀속소득", amount: v.gross, sign: "in" }
+      ];
+      if (v.directorCost) {
+        lines.push({ label: "배우 부담 인건비", amount: v.directorCost, sign: "out" });
+      }
+      if (v.actorSupport) {
+        lines.push({ label: "배우 부담 지원비", amount: v.actorSupport, sign: "out" });
+      }
+      if (v.directorCost || v.actorSupport) {
+        lines.push({ label: "실과세표준", amount: v.preTax, sign: "result" });
+      }
+      if (v.necessaryExpenses) {
+        lines.push({
+          label: "추계 필요경비 " + pctView(v.expenseRate) + "%",
+          amount: v.necessaryExpenses,
+          sign: "out"
+        });
+      }
+      lines.push(
         { label: "종합소득세", amount: v.incomeTax, sign: "out" },
         { label: "지방소득세", amount: v.localIncomeTax, sign: "out" },
         { label: "실수령", amount: v.net, total: true, sign: "result" }
-      ]);
+      );
+      return scenarioYearCol(year, lines);
     });
     html += scenarioGroupFoot("전체 세후 개인실수령", ex.actorNetIncome, "open-scenario-ex-person-help");
     var exTaxInner = scenarioYearColsHtml(years, function (year) {
@@ -6464,6 +6741,7 @@
       scenarioMiniRow("실과세표준", App.Money.roundWon(
         ex.actorGrossIncome - ex.directorCost - ex.actorBorneSupportCost
       ), "result") +
+      scenarioMiniRow("추계 필요경비", (ex.personalTaxDetail && ex.personalTaxDetail.necessaryExpenses) || 0, "out") +
       scenarioMiniRow("종합소득세", ex.incomeTax, "out") +
       scenarioMiniRow("지방소득세", ex.localIncomeTax, "out") +
       scenarioMiniRow("세후 개인 실수령", ex.actorNetIncome, "result") +
@@ -6621,6 +6899,7 @@
     html += "<h2>시나리오 비교</h2>";
     html += '<button type="button" class="help-q" data-action="open-scenario-compare-help" aria-label="시나리오 비교 안내">?</button>';
     html += "</div>";
+    html += estimateDisclaimerHtml("estimate-disclaimer-inline");
     if (!ids.length) {
       if (ui && ui.scenarioCompareHelpOpen) html += renderScenarioCompareHelpModal(null);
       html += '<p class="muted">비교할 시나리오를 시뮬레이션 설정에서 켜세요.</p></div>';
@@ -6667,8 +6946,9 @@
     if (opts.total) cls += " total";
     if (opts.hl) cls += " hl";
     cls += analysisValueClass(value);
+    var noteHtml = opts.note ? '<div class="tax-line-note">' + esc(opts.note) + "</div>" : "";
     return '<div class="' + cls + '">' +
-      "<span>" + esc(label) + "</span><b>" + esc(value) + "</b></div>";
+      "<span>" + esc(label) + "</span><b>" + esc(value) + "</b></div>" + noteHtml;
   }
 
   function taxResultStackLine(label, value, opts) {
@@ -6888,9 +7168,13 @@
     } else {
       html += taxResultLine("과세 대상 소득", analysisDisplayAmount(f.taxableIncome, "result"), { key: true });
     }
-    if (f.earnedGross && f.businessIncome) {
-      html += taxResultLine("수익배분", analysisDisplayAmount(f.businessIncome, "in"));
-      html += taxResultLine("추계 필요경비", analysisDisplayAmount(f.necessaryExpenses, "out"));
+    if (f.businessIncome) {
+      if (f.earnedGross) {
+        html += taxResultLine("수익배분", analysisDisplayAmount(f.businessIncome, "in"));
+      }
+      if (f.necessaryExpenses) {
+        html += taxResultLine("추계 필요경비", analysisDisplayAmount(f.necessaryExpenses, "out"));
+      }
     }
     if (f.otherIncome) {
       html += taxResultLine(f.payoutIncomeLabel || "대표 배당", analysisDisplayAmount(f.otherIncome, "in"));
@@ -7119,6 +7403,7 @@
     );
     html += inputRow("기타 종합소득 (첫 해만)", "additionalIncome");
     html += inputRow("필요경비 (매년)", "necessaryExpenses");
+    html += '<tr class="tax-row-mute"><td colspan="2"><p class="muted small" style="margin:0.4rem 0 0">필요경비를 0원으로 두면 업종 추계 경비율로 계산합니다. 전속(배우 개인) 기본은 5.9%, 1인 기획사 수익배분은 설정한 추계 경비율(미설정 시 공식 단순경비율)입니다. 금액을 넣으면 그 절대액을 우선합니다.</p></td></tr>';
     html += inputRow("추가 소득공제 (매년)", "incomeDeduction");
     html += inputRow("기타 과세조정 (매년)", "otherAdjustment");
     html += inputRow("기타 기납부세액 (첫 해만)", "prepaidTax");
@@ -7188,6 +7473,7 @@
     html += "<h3>종합소득세 계산</h3>";
     html += '<p class="muted small">시나리오 비교 대표 개인 상세와 같은 연도별 산식입니다. 아래는 ' +
       taxYears.join(" + ") + " 귀속 결과를 더한 표시이며, 합친 과세표준에 세율을 다시 적용하지 않습니다.</p>";
+    html += '<p class="muted small">추계 필요경비는 세금 계산에서 과세소득을 낮추는 공제 가정입니다. 실제 현금 지출을 한 번 더 차감하는 항목이 아니므로 실수령 행과 단순 가감 합계가 일치하지 않을 수 있습니다.</p>';
     html += '<div class="tax-compare">';
     html += '<table class="tax-pair"><thead><tr><th>기존 회사 전속</th><th>1인 기획사</th></tr></thead><tbody>';
     html += autoRow("근로소득공제",
@@ -7204,7 +7490,9 @@
     html += autoRow("산출세액", analysisDisplayAmount(ld.assessedTax != null ? ld.assessedTax : ld.incomeTax, "out"), analysisDisplayAmount(rd.assessedTax != null ? rd.assessedTax : rd.incomeTax, "out"));
     html += autoRow("자동 세액공제", analysisDisplayAmount(ld.autoTaxCredit, "out"), analysisDisplayAmount(rd.autoTaxCredit, "out"));
     html += outRow("결정세액", analysisDisplayAmount(left.row.determinedTax != null ? left.row.determinedTax : left.row.incomeTax, "result"), analysisDisplayAmount(right.row.determinedTax != null ? right.row.determinedTax : right.row.incomeTax, "result"));
-    html += outRow("추가 납부 종합소득세", analysisDisplayAmount(ld.additionalIncomeTax, "out"), analysisDisplayAmount(rd.additionalIncomeTax, "out"));
+    html += outRow("기납부 차감 후 정산액 (+납부 / −환급)",
+      analysisDisplayAmount(ld.additionalPayment, "delta"),
+      analysisDisplayAmount(rd.additionalPayment, "delta"));
     html += outRow("지방소득세", analysisDisplayAmount(left.row.localIncomeTax, "out"), analysisDisplayAmount(right.row.localIncomeTax, "out"));
     html += outRow("개인 최종 세부담", analysisDisplayAmount(left.row.personalTax, "out"), analysisDisplayAmount(right.row.personalTax, "out"), "tax-row-key");
     html += outRow("세후 개인 실수령", analysisDisplayAmount(left.row.actorNetIncome, "result"), analysisDisplayAmount(right.row.actorNetIncome, "result"), "tax-row-hl");
@@ -7212,8 +7500,9 @@
     html += autoRow("법인 잔여현금", "—", analysisDisplayAmount(right.row.corporateEndingCash, "result"));
     html += "</tbody></table></div></div></details>";
 
-    html += '<p class="muted small tax-disclaimer">시뮬레이션용 예상세액이며 실제 신고세액과 다를 수 있습니다. ' +
+    html += '<p class="muted small tax-disclaimer">결과는 시뮬레이션 예상치이며 실제 세무 신고액과 다를 수 있습니다. ' +
       esc(source) + "</p>";
+    html += estimateDisclaimerHtml("estimate-disclaimer-inline");
     html += "</div>";
     return html;
   }
@@ -7598,10 +7887,12 @@
     html += renderAnalysisHead(state, result, ui, tab);
     if (tab === "revenue-floor") {
       html += renderRevenueFloorView(state, result, ui);
+      html += estimateDisclaimerHtml();
       html += "</div>";
       return html;
     }
     html += renderAnalysisCompareView(state, result, ui);
+    html += estimateDisclaimerHtml();
     html += "</div>";
     return html;
   }

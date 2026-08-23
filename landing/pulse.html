@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>30초 독립 가능성 테스트</title>
+  <meta name="description" content="연 매출·정산 비율·회사 부담을 고르면 독립을 숫자로 볼지 방향을 안내합니다. 입력 금액은 서버에 저장하지 않습니다." />
+  <meta property="og:title" content="30초 독립 가능성 테스트" />
+  <meta property="og:description" content="전속 vs 1인 기획사 — 상담 없이 방향만 빠르게 확인해 보세요." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="css/landing.css" />
+</head>
+<body>
+  <div class="page" hidden>
+    <nav class="top-nav">
+      <a href="index.html" data-carry-ref>← 처음으로</a>
+      <a href="about.html" data-carry-ref>누가 만들었나요?</a>
+    </nav>
+
+    <div id="quiz-view">
+      <p class="pulse-kicker">약 30초 · 6문항</p>
+      <h1 style="font-size:20px;margin:4px 0 8px;">독립 가능성 테스트</h1>
+      <p class="section-body">금액 입력 없이 구간만 고릅니다. 결과는 방향 안내일 뿐, 전속계약 분석 숫자와 같지 않습니다.</p>
+      <p class="small-print">결과는 시뮬레이션 예상치이며 실제 세무 신고액과 다를 수 있습니다. 법률·세무 자문이 아닙니다.</p>
+
+      <div class="pulse-progress" aria-hidden="true">
+        <div class="pulse-progress-bar" id="pulse-bar"></div>
+      </div>
+      <p class="small-print" id="pulse-step-label">1 / 6</p>
+
+      <div class="card" id="pulse-card">
+        <div class="field" style="margin-bottom:12px;">
+          <label id="pulse-q-text" for="pulse-choices">문항</label>
+        </div>
+        <div class="choice-grid" id="pulse-choices" role="group" aria-labelledby="pulse-q-text"></div>
+      </div>
+
+      <button type="button" class="btn btn-secondary" id="pulse-back" hidden>이전</button>
+    </div>
+
+    <div id="result-view" hidden>
+      <p class="pulse-kicker">테스트 결과</p>
+      <h1 id="r-title" style="font-size:20px;margin:4px 0 8px;">-</h1>
+      <p class="section-body" id="r-body"></p>
+      <div class="verdict similar" id="r-band"></div>
+      <p class="small-print" id="r-disclaimer"></p>
+
+      <a class="btn btn-primary" id="r-cta-primary" href="contract.html" data-carry-ref>다음</a>
+      <button type="button" class="btn btn-secondary" id="btn-restart">다시 하기</button>
+    </div>
+
+    <div class="brand-footer"><a href="about.html" data-carry-ref>누가 만들었나요?</a></div>
+  </div>
+
+  <script src="js/pulse-engine.js"></script>
+  <script src="js/campaign-config.js"></script>
+  <script src="js/link-gate.js"></script>
+  <script src="js/visit-ping-config.js"></script>
+  <script src="js/visit-ping.js"></script>
+  <script>
+    (function () {
+      App.LinkGate.check({ expiredUrl: "expired.html" }).then(function (state) {
+        if (state !== "expired") App.VisitPing.notify("pulse");
+      });
+
+      var questions = App.PulseEngine.QUESTIONS;
+      var answers = App.PulseEngine.normalizeAnswers({});
+      var step = 0;
+
+      function paint() {
+        var q = questions[step];
+        document.getElementById("pulse-step-label").textContent = (step + 1) + " / " + questions.length;
+        document.getElementById("pulse-bar").style.width = (((step + 1) / questions.length) * 100) + "%";
+        document.getElementById("pulse-q-text").textContent = q.text;
+        document.getElementById("pulse-back").hidden = step === 0;
+
+        var box = document.getElementById("pulse-choices");
+        box.innerHTML = "";
+        for (var i = 0; i < q.options.length; i++) {
+          (function (opt) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "choice-btn" + (answers[q.id] === opt.value ? " is-selected" : "");
+            btn.textContent = opt.label;
+            btn.addEventListener("click", function () {
+              answers[q.id] = opt.value;
+              if (step < questions.length - 1) {
+                step += 1;
+                paint();
+              } else {
+                showResult();
+              }
+            });
+            box.appendChild(btn);
+          })(q.options[i]);
+        }
+      }
+
+      function showResult() {
+        var result = App.PulseEngine.evaluate(answers);
+        if (!result.ok) {
+          step = 0;
+          paint();
+          return;
+        }
+        document.getElementById("r-title").textContent = result.copy.title;
+        document.getElementById("r-body").textContent = result.copy.body;
+        var bandEl = document.getElementById("r-band");
+        bandEl.className = "verdict " + (result.band === "explore" ? "solo" : (result.band === "stay" ? "current" : "similar"));
+        bandEl.textContent = "안내 점수 " + result.score + " / " + result.maxScore + " · 원점수는 참고용";
+        document.getElementById("r-disclaimer").textContent = result.disclaimer;
+
+        var p = document.getElementById("r-cta-primary");
+        p.textContent = result.copy.ctaPrimary;
+        p.setAttribute("href", result.copy.ctaPrimaryHref);
+
+        document.getElementById("quiz-view").hidden = true;
+        document.getElementById("result-view").hidden = false;
+        App.LinkGate.wireInternalLinks();
+        window.scrollTo(0, 0);
+      }
+
+      document.getElementById("pulse-back").addEventListener("click", function () {
+        if (step > 0) {
+          step -= 1;
+          paint();
+        }
+      });
+
+      document.getElementById("btn-restart").addEventListener("click", function () {
+        answers = App.PulseEngine.normalizeAnswers({});
+        step = 0;
+        document.getElementById("result-view").hidden = true;
+        document.getElementById("quiz-view").hidden = false;
+        paint();
+        window.scrollTo(0, 0);
+      });
+
+      paint();
+    })();
+  </script>
+</body>
+</html>

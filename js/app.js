@@ -255,6 +255,17 @@
   function refreshPayoutFitPreview(el) {
     var key = el.getAttribute("data-payout-fit");
     App.Render.applyPayoutFitDraft(state, result, ui, key, parseValue(el));
+    if (ui.payoutFitTrial) {
+      if (!state.settings) state.settings = {};
+      state.settings.payoutFitDraft = JSON.parse(JSON.stringify(ui.payoutFitTrial));
+      scheduleSave();
+    }
+    if (key === "profitSettleOn") {
+      if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
+      ui.analysisFoldOpen["payout-fit"] = true;
+      afterChange(true);
+      return;
+    }
     if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
     ui.analysisFoldOpen["payout-fit"] = true;
     var fromEnd = String(el.value || "").length - (el.selectionStart || 0);
@@ -605,6 +616,21 @@
 
   function applyField(el, fromChange) {
     var path = el.getAttribute("data-path");
+    if (/^revenueFees\.\d+\.rateByYear\.\d{4}$/.test(path)) {
+      var rawYear = el.type === "checkbox" ? el.checked : el.value;
+      if (rawYear === "" || rawYear == null) {
+        var yp = path.split(".");
+        var feeIdx = Number(yp[1]);
+        var yearKey = yp[3];
+        var feeObj = state.revenueFees && state.revenueFees[feeIdx];
+        if (feeObj && feeObj.rateByYear && typeof feeObj.rateByYear === "object") {
+          delete feeObj.rateByYear[yearKey];
+          if (!Object.keys(feeObj.rateByYear).length) delete feeObj.rateByYear;
+        }
+        afterChange(fromChange);
+        return;
+      }
+    }
     var value = parseValue(el);
     if (path.indexOf("revenueDraft.") === 0) {
       applyRevenueDraftField(path, value, fromChange);
@@ -615,6 +641,10 @@
       ensureFee(idx);
     }
     setByPath(state, path, value);
+    if (/\.profitShare(Work|Sales)Rate$/.test(path) || /profitShareRateByYear\.\d{4}$/.test(path)) {
+      App.Defaults.ensureScenarioSettings(state);
+      state.settings.scenarios.soloAgency.ownerPayout.profitShareOn = true;
+    }
     if (/\.periodMode$/.test(path) && value === "custom") {
       var item = getByPath(state, path.replace(/\.periodMode$/, ""));
       if (item && typeof item === "object") {
@@ -712,7 +742,22 @@
     }
     if (/\.(exclusivePayer|soloPayer)$/.test(path) && /^settings\.supportPolicies\.\d+\./.test(path)) {
       var policy = getByPath(state, path.replace(/\.(exclusivePayer|soloPayer)$/, ""));
+      if (policy && value === "share") {
+        var shareKey = /\.soloPayer$/.test(path) ? "soloCompanyShareRate" : "exclusiveCompanyShareRate";
+        var currentShare = App.Money.toRatio(policy[shareKey]);
+        if (currentShare <= 0 || currentShare >= 1) policy[shareKey] = 0.5;
+      }
       App.Defaults.syncSupportPolicyPayer(policy);
+    }
+    if (/\.(soloCompanyShareRate|exclusiveCompanyShareRate)$/.test(path) && /^settings\.supportPolicies\.\d+\./.test(path)) {
+      var sharePolicy = getByPath(state, path.replace(/\.(soloCompanyShareRate|exclusiveCompanyShareRate)$/, ""));
+      if (sharePolicy) {
+        var payerKey = /\.soloCompanyShareRate$/.test(path) ? "soloPayer" : "exclusivePayer";
+        sharePolicy[payerKey] = "share";
+        App.Defaults.syncSupportPolicyPayer(sharePolicy);
+        var complement = document.querySelector('[data-share-complement="' + path + '"]');
+        if (complement) complement.textContent = (Math.round((1 - App.Money.toRatio(value)) * 1000) / 10) + "%";
+      }
     }
     if (/^vehicles\.\d+\.startMonth$/.test(path)) {
       var vehMonth = getByPath(state, path.replace(/\.startMonth$/, ""));
@@ -898,6 +943,11 @@
     }
     if (action === "payout-fit-apply") {
       App.Render.applyPayoutFitPreview(state, result, ui);
+      if (ui.payoutFitTrial) {
+        if (!state.settings) state.settings = {};
+        state.settings.payoutFitDraft = JSON.parse(JSON.stringify(ui.payoutFitTrial));
+        scheduleSave();
+      }
       if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
       ui.analysisFoldOpen["payout-fit"] = true;
       ui.analysisFoldOpen.monthly = true;
@@ -907,6 +957,11 @@
     }
     if (action === "payout-fit-revert") {
       App.Render.revertPayoutFitPreview(state, result, ui);
+      if (ui.payoutFitTrial) {
+        if (!state.settings) state.settings = {};
+        state.settings.payoutFitDraft = JSON.parse(JSON.stringify(ui.payoutFitTrial));
+        scheduleSave();
+      }
       if (!ui.analysisFoldOpen) ui.analysisFoldOpen = {};
       ui.analysisFoldOpen["payout-fit"] = true;
       renderMain();
@@ -947,6 +1002,11 @@
     }
     if (action === "reset-profit-share-expense-rate") {
       state.settings.scenarios.soloAgency.ownerPayout.profitShareExpenseRateOverride = null;
+      renderMain();
+      return;
+    }
+    if (action === "reset-exclusive-actor-expense-rate") {
+      state.settings.scenarios.exclusiveContract.actorExpenseRateOverride = null;
       renderMain();
       return;
     }
@@ -1269,6 +1329,16 @@
       afterChange(true);
       return;
     }
+    if (action === "set-profit-share-on") {
+      App.Defaults.setOwnerProfitShareOn(state, btn.getAttribute("data-on") === "1");
+      if (ui.payoutFitTrial) ui.payoutFitTrial.profitSettleOn = btn.getAttribute("data-on") === "1";
+      if (state.settings && state.settings.payoutFitDraft) {
+        state.settings.payoutFitDraft.profitSettleOn = btn.getAttribute("data-on") === "1";
+        if (btn.getAttribute("data-on") !== "1") state.settings.payoutFitDraft.profitSettle = 0;
+      }
+      afterChange(true);
+      return;
+    }
     if (action === "set-dividend-mode") {
       App.Defaults.setOwnerDividendMode(state, btn.getAttribute("data-mode"));
       afterChange(true);
@@ -1510,7 +1580,7 @@
         id: App.uid(), name: "", role: "", monthlySalary: 0,
         incentiveSeollal: 0, incentiveChuseok: 0, incentiveYearEnd: 0,
         periodMode: "full", startMonth: null, endMonth: null,
-        insure: true, meal: true, severance: false, include: true
+        insure: true, insureLimited: false, meal: true, severance: false, include: true
       };
       state.employees.push(emp);
       openNewCostItem("employees", emp);
