@@ -763,7 +763,7 @@
       "id": "21efb855-f92f-4b42-8c33-c07031603f27",
       "name": "배우",
       "role": "대표이사",
-      "monthlySalary": 5000000,
+      "monthlySalary": 15000000,
       "startMonth": null,
       "endMonth": null,
       "insure": true,
@@ -975,29 +975,6 @@
   "forcedWorkdays": [],
   "settings": {
     "initialCashTiming": "beforeOutflows",
-    "payoutFitDraft": {
-      "monthlySalary": 5000000,
-      "monthlySalaryByYear": {
-        "2026": 5000000,
-        "2027": 5000000
-      },
-      "salaryInc": 75000000,
-      "profitSettle": 287475000,
-      "profitSettleRate": 0.1362440758293839,
-      "profitSettleRateByYear": {
-        "2026": 0,
-        "2027": 0.15
-      },
-      "profitSettleOn": true,
-      "dividend": 0,
-      "dividendOn": false,
-      "dividendRate": 0.1,
-      "dividendRateByYear": {
-        "2026": 0.1,
-        "2027": 0.1
-      },
-      "dividendMode": "rate"
-    },
     "meal": {
       "dailyRate": 12000,
       "calendarMode": "weekdaysExcludingHolidays",
@@ -1316,6 +1293,7 @@
           "dividendRate": 0.1,
           "dividendOn": false,
           "dividendMonth": null,
+          "profitShareOn": false,
           "profitShareWorkRate": 0.3,
           "profitShareSalesRate": 0.3,
           "profitShareExpenseRateOverride": 0.059
@@ -1352,6 +1330,7 @@
         "label": "기존 회사 전속",
         "companyShareRate": 0.4,
         "actorShareRate": 0.6,
+        "actorExpenseRateOverride": 0.059,
         "costBurdenRules": {
           "projectDirect": "company",
           "projectExpense": "company",
@@ -1435,6 +1414,31 @@
       "rate": 0.1,
       "period": "quarterly",
       "filingLagMonths": 1
+    },
+    "payoutFitDraft": {
+      "monthlySalary": 5000000,
+      "monthlySalaryByYear": {
+        "2026": 15000000,
+        "2027": 5000000
+      },
+      "salaryInc": 105000000,
+      "profitSettle": 0,
+      "profitSettleRate": 0.2914691943127962,
+      "profitSettleRateByYear": {
+        "2026": 0.2689922480620155,
+        "2027": 0.2937385859639969
+      },
+      "profitSettleOn": false,
+      "dividend": 0,
+      "dividendOn": false,
+      "dividendRate": 0.1,
+      "dividendRateByYear": {
+        "2026": 0.1,
+        "2027": 0.1
+      },
+      "dividendMode": "rate",
+      "dividendByYear": {},
+      "dividendModeByYear": {}
     }
   },
   "meta": {
@@ -1445,7 +1449,7 @@
     "title": "배우",
     "storageMode": "local",
     "createdAt": "2026-08-20T10:17:17.052Z",
-    "updatedAt": "2026-08-23T02:27:11.498Z"
+    "updatedAt": "2026-08-23T03:54:44.371Z"
   },
   "salesPlans": [
     {
@@ -1532,12 +1536,12 @@
       "name": "작품 및 광고 영업수수료",
       "basis": "totalRevenue",
       "revenueScope": "totalRevenue",
-      "rate": 0.06,
+      "rate": 0.08,
       "category": "agency",
       "include": true,
       "rateByYear": {
-        "2026": 0.06,
-        "2027": 0.06
+        "2026": 0.08,
+        "2027": 0.08
       }
     }
   ],
